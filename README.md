@@ -187,3 +187,18 @@ vad_rms_threshold = 500.0             # higher = needs louder speech
 .venv/bin/pip install -e .[dev]
 .venv/bin/pytest -q
 ```
+
+## Standalone binary
+
+To produce a single self-contained executable (no Python, no venv required
+on the target machine — only `libportaudio.so.2` plus whichever output
+tools you use):
+
+```bash
+scripts/build-binary.sh
+# -> dist/flm-voice  (~30 MB)
+```
+
+The script uses PyInstaller in `--onefile` mode. Drop `dist/flm-voice` into
+`~/.local/bin/`, point your systemd unit's `ExecStart=` at it, and the
+Python source tree is no longer needed at runtime.
