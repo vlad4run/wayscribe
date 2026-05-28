@@ -1,7 +1,7 @@
 """Long-lived daemon: asyncio Unix-socket server + state machine.
 
-Owns the Recorder, dispatches transcription, and feeds output backends. No
-PyQt yet — MVP uses notifications + clipboard only.
+Owns the Recorder, dispatches transcription, and feeds output backends
+(clipboard / keystroke synthesis / KDE notifications). Headless — no GUI.
 """
 from __future__ import annotations
 

@@ -30,8 +30,6 @@ class Config:
     sample_rate: int = 16000
     input_device: str | None = None
     outputs: list[str] = field(default_factory=lambda: ["clipboard", "notify"])
-    auto_action: str | None = None
-    show_overlay: bool = True
     # Phase-6 polish
     max_duration_sec: float = 300.0
     warmup: bool = True
