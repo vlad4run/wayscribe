@@ -1,0 +1,14 @@
+[Unit]
+Description=flm-voice daemon (voice-to-text overlay for KDE Plasma Wayland)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/flm-voice daemon
+Restart=on-failure
+RestartSec=2
+Environment=QT_QPA_PLATFORM=wayland
+
+[Install]
+WantedBy=graphical-session.target
