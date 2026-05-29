@@ -27,6 +27,11 @@ for NPU prerequisites, kernel driver setup, and the Docker image build.
 
 ## Setup
 
+> For a compressed step-by-step checklist (new-machine bringup, package
+> install, hotkey wiring, smoke test, troubleshooting table), see
+> [SETUP.md](SETUP.md). The sections below have the same content with
+> more explanation.
+
 ### 1. System packages
 
 ```bash
