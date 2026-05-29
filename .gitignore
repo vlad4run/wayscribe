@@ -8,6 +8,7 @@ venv/
 build/
 dist/
 *.spec
+deploy/.env
 *.wav
 *.ogg
 !sample_audio.ogg

@@ -1,0 +1,45 @@
+# FastFlowLM serving Whisper V3 Turbo (ASR) + an LLM on the AMD Ryzen AI NPU.
+# Pairs with the flm-voice client (see ../README.md).
+#
+# Quick start:
+#   cp .env.example .env       # then edit RENDER_GID for your host
+#   docker compose up -d
+#   docker compose logs -f
+#
+# First-run model download (the `serve` command auto-downloads the Whisper
+# model and the LLM on startup; you'll see ~620 MB pulled the first time).
+#
+# Permissions / ownership:
+#
+#   1. /dev/accel/accel0 on the host is owned by root:render. `group_add`
+#      grants the container's root process the host render GID so it can
+#      open the NPU device. Set RENDER_GID in .env to the value from
+#      `getent group render | cut -d: -f3` on your host.
+#
+#   2. The `:z` suffix on the bind mount tells Docker to apply an SELinux
+#      label (`container_file_t`) so the container's domain can read/write
+#      the host directory. Required on openSUSE/Fedora; harmless on
+#      systems without SELinux. Without it you'll see `Permission denied`
+#      when FLM tries to download model files.
+#
+#   3. The container runs as root (FLM's image assumes $HOME=/root for its
+#      cache path), so files downloaded into ${HOME}/.config/flm on the
+#      host end up root-owned. To inspect or back them up as your user:
+#        sudo chown -R $USER:$USER ~/.config/flm
+
+services:
+  flm-serve:
+    image: fastflowlm:latest
+    container_name: flm-serve
+    restart: unless-stopped
+    command: serve ${FLM_LLM_MODEL:-gemma3:1b} --asr 1
+    devices:
+      - /dev/accel/accel0
+    group_add:
+      - "${RENDER_GID:?Set RENDER_GID in .env — see .env.example}"
+    ulimits:
+      memlock: -1
+    volumes:
+      - ${HOME}/.config/flm:/root/.config/flm:z
+    ports:
+      - "${FLM_PORT:-52625}:52625"

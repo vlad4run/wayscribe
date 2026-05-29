@@ -47,7 +47,27 @@ python3 -m venv .venv
 
 For a binary in `~/.local/bin` instead, use `pipx install .`.
 
-### 3. Run the daemon
+### 3. Start the FLM backend
+
+Either with the `docker run` shown above, or via the compose file in
+[deploy/compose.yaml](deploy/compose.yaml):
+
+```bash
+cd deploy
+cp .env.example .env       # then edit RENDER_GID for your host:
+                           #   getent group render | cut -d: -f3
+docker compose up -d
+docker compose logs -f
+```
+
+The compose file handles the NPU device, `memlock=-1`, the host's `render`
+group, the SELinux `:z` label for the bind-mounted model cache, and
+`restart: unless-stopped`. See its header for the full ownership story —
+short version: models land in `~/.config/flm` root-owned (that's how
+FLM's image expects to write to `$HOME=/root`); `sudo chown -R $USER ~/.config/flm`
+if you want to inspect them as your user.
+
+### 4. Run the flm-voice daemon
 
 In a terminal, or as a systemd `--user` unit
 ([flm_voice/service/flm-voice.service](flm_voice/service/flm-voice.service)):
@@ -59,7 +79,7 @@ cp flm_voice/service/flm-voice.service ~/.config/systemd/user/
 systemctl --user enable --now flm-voice
 ```
 
-### 4. Bind hotkeys
+### 5. Bind hotkeys
 
 ```bash
 ./scripts/install-kde-hotkey.sh   # generates a .desktop launcher
@@ -70,7 +90,7 @@ Then in **System Settings → Shortcuts → Custom Shortcuts**, bind:
 - `Meta+Alt+Space` → `flm-voice toggle` *(start/stop recording)*
 - `Meta+Alt+L` → `flm-voice lang next` *(cycle language; notification shows the new value)*
 
-### 5. Talk
+### 6. Talk
 
 Press the hotkey, speak, press again. Transcript goes to the clipboard
 and a notification pops up with a preview. Paste with `Ctrl+V`.
