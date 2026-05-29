@@ -135,6 +135,20 @@ Key choices:
   A startup warm-up POST primes FLM so the first real transcription
   doesn't pay the cold-load cost.
 
+### Measured latency (Strix Point HX 370)
+
+| Audio | Round-trip via `/v1/audio/transcriptions` |
+| --- | --- |
+| 1 s (silent WAV) | ~2.2 s — base per-request overhead |
+| 5 s of speech | ~3.5 s (extrapolated) |
+| 10 s of speech | ~4.0 s (extrapolated) |
+| 30 s JFK clip | 5.1–5.5 s (3 consecutive runs) |
+
+Throughput is ~6× real-time. The flat ~2 s overhead per call dominates
+short utterances; the per-second processing cost is small. Note: feeding
+FLM pure silence yields short hallucinations (`*Police*`, `E aí E aí…`);
+the daemon's warm-up uses 1 s of silence and discards the result.
+
 ## Project layout
 
 ```text
