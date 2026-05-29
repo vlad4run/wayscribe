@@ -19,7 +19,7 @@ docker run -d --rm \
   -p 52625:52625 \
   --restart unless-stopped \
   --name flm-serve \
-  fastflowlm serve gemma3:1b --asr 1
+  fastflowlm serve gemma3:1b --asr 1 --host 0.0.0.0
 ```
 
 See [fastflowlm-docker README](../ai370.npu/fastflowlm-docker/README.md)

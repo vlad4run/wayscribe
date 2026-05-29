@@ -126,6 +126,7 @@ wl-paste                      # transcript should be in the clipboard
 | `FLM unreachable at http://localhost:52625` | Container down | `cd ~/AI/whisper.npu/deploy && docker compose ps` |
 | `Permission denied` on `~/.config/flm` | SELinux label | Already handled by `:z` in compose; check `ls -lZ ~/.config/flm` |
 | `Unable to find group render` (docker) | `group_add` used name, not GID | Confirm `RENDER_GID` in `deploy/.env` matches `getent group render` |
-| `DRM_IOCTL_AMDXDNA_CREATE_HWCTX failed` | XRT / firmware mismatch | See [fastflowlm-docker troubleshooting](../ai370.npu/fastflowlm-docker/README.md#troubleshooting); rebuild xdna-driver from source for kernel ≥ 6.17 |
+| `WebServer started on port 52625` but `curl localhost:52625` is refused | FLM defaults `--host 127.0.0.1` (container loopback); Docker can't forward to that | Add `--host 0.0.0.0` to the serve command (already in `deploy/compose.yaml`) |
+| `Failed to load default model: gemma3:1b` + `DRM_IOCTL_AMDXDNA_CREATE_HWCTX failed` | NPU has 8 columns; Whisper (ASR) + gemma3:1b together don't fit — confirmed on Strix Point HX 370 | Harmless for flm-voice: server still starts and Whisper transcription works. If you actually need the LLM endpoint, pick a smaller one in `deploy/.env`: `FLM_LLM_MODEL=qwen3:0.6b` |
 | Transcription empty | Mic muted / wrong source | `pactl list sources short`; pick one and set `input_device` in `~/.config/flm-voice/config.toml` |
 | Clipboard not updated | `wl-clipboard` missing | `sudo zypper install wl-clipboard` |

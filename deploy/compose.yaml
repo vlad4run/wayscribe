@@ -32,7 +32,11 @@ services:
     image: fastflowlm:latest
     container_name: flm-serve
     restart: unless-stopped
-    command: serve ${FLM_LLM_MODEL:-gemma3:1b} --asr 1
+    # --host 0.0.0.0 is required: FLM's default 127.0.0.1 binds only to
+    # the container's loopback, which Docker's port-forward can't reach
+    # from the host. Without this the WebServer logs "started on port 52625"
+    # but curl gets connection-refused.
+    command: serve ${FLM_LLM_MODEL:-gemma3:1b} --asr 1 --host 0.0.0.0
     devices:
       - /dev/accel/accel0
     group_add:
