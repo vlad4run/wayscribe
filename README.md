@@ -148,6 +148,8 @@ the daemon's warm-up uses 1 s of silence and discards the result.
 ```text
 whisper.npu/
 ├── pyproject.toml
+├── README.md
+├── SETUP.md                    # new-machine bringup checklist
 ├── flm_voice/
 │   ├── __main__.py             # CLI: daemon | toggle | status | stop | cancel | oneshot | lang
 │   ├── config.py               # XDG config + socket path
@@ -159,10 +161,23 @@ whisper.npu/
 │   ├── vad.py                  # energy-based has_speech (pure numpy)
 │   └── service/
 │       └── flm-voice.service   # systemd --user unit
+├── deploy/
+│   ├── compose.yaml            # FLM backend (Whisper + LLM on the NPU)
+│   └── .env.example            # RENDER_GID / FLM_PORT / FLM_LLM_MODEL
+├── packaging/
+│   ├── flm-voice.service       # unit shipped in the RPM
+│   ├── flm-voice.spec          # rpmbuild spec
+│   └── config.example.toml     # reference config shipped as %doc
 ├── scripts/
 │   ├── install-kde-hotkey.sh   # register Custom Shortcut helper
-│   └── bench_transcribe.py     # latency smoke test against FLM serve
+│   ├── bench_transcribe.py     # latency smoke test against FLM serve
+│   ├── build-binary.sh         # PyInstaller --onefile -> dist/flm-voice
+│   └── build-rpm.sh            # binary -> ~/rpmbuild/RPMS/x86_64/*.rpm
 └── tests/
+    ├── test_language.py
+    ├── test_recorder.py
+    ├── test_skeleton.py
+    └── test_vad.py
 ```
 
 ## CLI
@@ -181,13 +196,16 @@ whisper.npu/
 
 ## Configuration
 
-Optional `$XDG_CONFIG_HOME/flm-voice/config.toml`:
+Optional `$XDG_CONFIG_HOME/flm-voice/config.toml`. The RPM ships a
+commented template at `/usr/share/doc/packages/flm-voice/config.example.toml`
+— copy it to `~/.config/flm-voice/config.toml` and edit. Keys (defaults shown):
 
 ```toml
 endpoint = "http://localhost:52625"   # or a LAN host, e.g. "http://192.168.1.50:52625"
 model = "whisper-v3:turbo"
 request_timeout_sec = 60.0            # HTTP timeout per transcription POST
-language = "ru"                       # ISO-639-1; omit for auto-detect
+language = "ru"                       # ISO-639-1; default "ru" — `flm-voice lang auto` for auto-detect
+language_from_layout = true           # default on: follow the active KDE keyboard layout per recording
 languages = ["ru", "en"]              # cycled by `flm-voice lang next`
 sample_rate = 16000
 # input_device = "alsa_input.pci-0000_..."
@@ -214,6 +232,15 @@ vad_rms_threshold = 500.0             # higher = needs louder speech
   the docker invocation means it survives reboots. Without it, the
   daemon's first `toggle` will get a clean `FLM unreachable` notification
   and stay idle (it won't crash).
+- **Language follows keyboard layout** (`language_from_layout`, on by
+  default). At each recording start the daemon reads the active KDE layout
+  from KWin's `org.kde.KeyboardLayouts` D-Bus interface (via `gdbus`) and
+  maps the xkb code to ISO-639-1 (`us`/`gb` → `en`, others pass through),
+  so the `Meta+Alt+L` lang hotkey is usually unnecessary. Best-effort: on a
+  non-KDE session, no session bus, or missing `gdbus` it silently keeps the
+  configured `language`. While on, manual `flm-voice lang` changes are
+  overwritten on the next recording — set `language_from_layout = false` to
+  pin the language manually.
 
 ## Development
 

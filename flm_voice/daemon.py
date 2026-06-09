@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 
-from flm_voice import output, vad
+from flm_voice import keyboard, output, vad
 from flm_voice.config import Config, socket_path
 from flm_voice.recorder import Recorder, silent_wav
 from flm_voice.transcriber import transcribe_async
@@ -89,6 +89,14 @@ class Daemon:
         next_value = langs[(idx + 1) % len(langs)]
         return self._set_language(next_value)
 
+    async def _sync_language_from_layout(self) -> None:
+        if not self.cfg.language_from_layout:
+            return
+        lang = await keyboard.current_layout_lang()
+        if lang and lang != self.cfg.language:
+            self.cfg.language = lang
+            log.info("language follows layout -> %s", lang)
+
     async def handle_command(self, msg: dict[str, Any]) -> dict[str, Any]:
         cmd = msg.get("cmd", "")
         async with self.lock:
@@ -133,6 +141,7 @@ class Daemon:
             output.notify("flm-voice", f"mic error: {exc}", icon="dialog-error")
             return {"ok": False, "error": str(exc)}
         self.state = State.RECORDING
+        await self._sync_language_from_layout()
         output.notify("flm-voice", "recording…", icon="audio-input-microphone")
         self._max_duration_task = asyncio.create_task(self._max_duration_watchdog())
         if self.cfg.auto_stop:

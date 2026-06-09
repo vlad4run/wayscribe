@@ -113,7 +113,7 @@ Shortcuts**:
 ## 6. Smoke test the full stack
 
 ```bash
-flm-voice status              # {"ok": true, "state": "idle", "language": "auto"}
+flm-voice status              # {"ok": true, "state": "idle", "language": "ru"}
 flm-voice toggle              # press hotkey, speak 3 sec, hotkey again
 wl-paste                      # transcript should be in the clipboard
 ```

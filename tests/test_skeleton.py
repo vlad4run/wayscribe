@@ -5,8 +5,16 @@ import pytest
 
 
 def test_package_imports() -> None:
-    from flm_voice import config, ipc, output  # noqa: F401
-    from flm_voice import daemon, recorder, transcriber, vad  # noqa: F401
+    from flm_voice import (  # noqa: F401
+        config,
+        daemon,
+        ipc,
+        keyboard,
+        output,
+        recorder,
+        transcriber,
+        vad,
+    )
 
 
 def test_cli_help_does_not_crash(capsys: pytest.CaptureFixture[str]) -> None:

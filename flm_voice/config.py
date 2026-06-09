@@ -29,7 +29,8 @@ class Config:
     endpoint: str = "http://localhost:52625"
     model: str = "whisper-v3:turbo"
     request_timeout_sec: float = 60.0
-    language: str | None = None
+    language: str | None = "ru"
+    language_from_layout: bool = True
     languages: list[str] = field(default_factory=lambda: ["ru", "en"])
     sample_rate: int = 16000
     input_device: str | None = None

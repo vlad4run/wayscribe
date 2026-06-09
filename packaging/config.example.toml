@@ -1,0 +1,34 @@
+# flm-voice configuration — example / reference.
+#
+# Copy to ~/.config/flm-voice/config.toml and uncomment what you want to
+# change. Every key is optional; the values shown are the built-in defaults,
+# so an empty file (or no file at all) behaves exactly like this one.
+#
+#   cp /usr/share/doc/packages/flm-voice/config.example.toml \
+#      ~/.config/flm-voice/config.toml
+
+# --- FLM backend -------------------------------------------------------------
+# endpoint = "http://localhost:52625"   # or a LAN host: "http://192.168.1.50:52625"
+# model = "whisper-v3:turbo"
+# request_timeout_sec = 60.0            # HTTP timeout per transcription POST
+
+# --- Language ----------------------------------------------------------------
+# language = "ru"                       # ISO-639-1; `flm-voice lang auto` for auto-detect
+# language_from_layout = true           # follow the active KDE keyboard layout per recording
+                                        # (overrides `language`; needs gdbus + a KDE session)
+# languages = ["ru", "en"]              # cycled by `flm-voice lang next`
+
+# --- Audio -------------------------------------------------------------------
+# sample_rate = 16000
+# input_device = "alsa_input.pci-0000_..."   # omit to use the default source
+
+# --- Output ------------------------------------------------------------------
+# outputs = ["clipboard", "notify"]     # also: "type" (wtype/ydotool)
+
+# --- Safety rails ------------------------------------------------------------
+# warmup = true                         # POST a 1s silent WAV at daemon startup
+# max_duration_sec = 300                # hard cap; auto-stops + transcribes
+# auto_stop = false                     # opt-in: silence-detection auto-stop
+# auto_stop_silence_sec = 1.5           # required quiet window after first speech
+# auto_stop_min_record_sec = 0.8        # never auto-stop in the first N seconds
+# vad_rms_threshold = 500.0             # higher = needs louder speech

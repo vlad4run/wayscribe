@@ -31,6 +31,7 @@ cp dist/flm-voice                "$TOP/SOURCES/flm-voice"
 cp packaging/flm-voice.service   "$TOP/SOURCES/flm-voice.service"
 cp LICENSE                       "$TOP/SOURCES/LICENSE"
 cp README.md                     "$TOP/SOURCES/README.md"
+cp packaging/config.example.toml "$TOP/SOURCES/config.example.toml"
 
 echo ">>> Building RPM"
 rpmbuild -bb packaging/flm-voice.spec
