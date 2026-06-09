@@ -24,6 +24,10 @@
 
 # --- Output ------------------------------------------------------------------
 # outputs = ["clipboard", "notify"]     # also: "type" (wtype/ydotool)
+# auto_type = false                     # also type the transcript into the focused
+                                        # window via wtype/ydotool (sugar for adding
+                                        # "type" to outputs). Types wherever focus is
+                                        # when transcription finishes.
 
 # --- Safety rails ------------------------------------------------------------
 # warmup = true                         # POST a 1s silent WAV at daemon startup

@@ -207,6 +207,12 @@ class Daemon:
         except asyncio.CancelledError:
             return
 
+    def _effective_outputs(self) -> list[str]:
+        outputs = list(self.cfg.outputs)
+        if self.cfg.auto_type and "type" not in outputs:
+            outputs.append("type")
+        return outputs
+
     async def _transcribe_and_output(self, wav: bytes) -> None:
         try:
             text = await transcribe_async(wav, self.cfg)
@@ -227,7 +233,7 @@ class Daemon:
             output.notify("flm-voice", "(empty transcription)")
             self.state = State.IDLE
             return
-        for backend in self.cfg.outputs:
+        for backend in self._effective_outputs():
             try:
                 if backend == "clipboard":
                     output.to_clipboard(text)

@@ -210,6 +210,7 @@ languages = ["ru", "en"]              # cycled by `flm-voice lang next`
 sample_rate = 16000
 # input_device = "alsa_input.pci-0000_..."
 outputs = ["clipboard", "notify"]     # also: "type" (wtype/ydotool)
+auto_type = false                     # also type the transcript into the focused window
 
 warmup = true                         # POST a 1s silent WAV at daemon startup
 max_duration_sec = 300                # hard cap; auto-stops + transcribes
@@ -232,6 +233,13 @@ vad_rms_threshold = 500.0             # higher = needs louder speech
   the docker invocation means it survives reboots. Without it, the
   daemon's first `toggle` will get a clean `FLM unreachable` notification
   and stay idle (it won't crash).
+- **Auto-type into the focused window** (`auto_type = true`, or add `"type"`
+  to `outputs`). Synthesizes keystrokes via `wtype` (Wayland) or `ydotool`,
+  typing the transcript wherever focus is when transcription finishes — no
+  manual paste. Needs `wtype`/`ydotool` installed; raises (and is logged) if
+  neither is present. Reliable because nothing steals focus between the stop
+  hotkey and the result; clipboard stays as a fallback if you keep it in
+  `outputs`.
 - **Language follows keyboard layout** (`language_from_layout`, on by
   default). At each recording start the daemon reads the active KDE layout
   from KWin's `org.kde.KeyboardLayouts` D-Bus interface (via `gdbus`) and
