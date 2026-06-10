@@ -17,7 +17,7 @@ class BackendHealth:
     detail: str | None = None
 
     def has_model(self, model: str) -> bool:
-        return any(m == model or m.startswith(model) for m in self.models)
+        return any(m == model or m.startswith(model + ":") for m in self.models)
 
 
 def _parse_models(payload: object) -> list[str]:

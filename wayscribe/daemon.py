@@ -99,9 +99,12 @@ class Daemon:
 
     async def handle_command(self, msg: dict[str, Any]) -> dict[str, Any]:
         cmd = msg.get("cmd", "")
-        async with self.lock:
-            if cmd == "status":
-                health = await probe_async(self.cfg)
+        if cmd == "status":
+            # Probe outside the state lock: a slow/hung backend must not block
+            # toggle/cancel/stop or the auto-stop watchdogs (all serialize on
+            # self.lock) for the duration of the probe timeout.
+            health = await probe_async(self.cfg)
+            async with self.lock:
                 return self._status_snapshot(
                     {
                         "endpoint": self.cfg.endpoint,
@@ -109,6 +112,7 @@ class Daemon:
                     }
                 )
 
+        async with self.lock:
             if cmd == "stop":
                 self.stop_event.set()
                 return self._status_snapshot({"stopping": True})

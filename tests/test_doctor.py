@@ -21,9 +21,11 @@ def test_parse_models_handles_garbage() -> None:
 
 def test_backend_health_has_model_prefix_match() -> None:
     h = BackendHealth(True, ["whisper-v3:turbo"])
-    assert h.has_model("whisper-v3:turbo")
-    assert h.has_model("whisper-v3")  # prefix
+    assert h.has_model("whisper-v3:turbo")  # exact
+    assert h.has_model("whisper-v3")  # name, any tag
     assert not h.has_model("llama")
+    # tag boundary: "qwen3" must not match "qwen3.5:9b"
+    assert not BackendHealth(True, ["qwen3.5:9b"]).has_model("qwen3")
 
 
 def test_backend_checks_down_reports_two_failures(monkeypatch) -> None:

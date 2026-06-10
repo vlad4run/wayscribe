@@ -79,16 +79,17 @@ def _tool_checks(cfg: Config) -> list[Check]:
     checks.append(
         Check(
             "wtype/ydotool",
-            typer is not None,
+            typer is not None or not wants_type,
             (typer or "install wtype") if wants_type else "not needed",
             required=wants_type,
         )
     )
 
+    # notify is best-effort (silent no-op if missing), so never a hard failure.
     notify = shutil.which("notify-send") is not None
     checks.append(
         Check("notify-send", notify, "" if notify else "install libnotify-tools",
-              required="notify" in outputs)
+              required=False)
     )
     return checks
 
