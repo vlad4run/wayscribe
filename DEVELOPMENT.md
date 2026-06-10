@@ -6,7 +6,7 @@ For building wayscribe from source, running the tests, and producing the binary
 ## Project layout
 
 ```text
-whisper.npu/
+wayscribe/
 ├── pyproject.toml
 ├── README.md                   # user-facing install & usage guide
 ├── DEVELOPMENT.md              # this file
