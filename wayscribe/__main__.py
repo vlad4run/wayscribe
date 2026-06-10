@@ -13,6 +13,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status", help="Print daemon state as JSON")
     sub.add_parser("stop", help="Tell the daemon to exit cleanly")
     sub.add_parser("cancel", help="Discard the current recording without transcribing")
+    sub.add_parser("doctor", help="Diagnose daemon, backend, tools, and config")
     one = sub.add_parser("oneshot", help="Record for N seconds and print transcript (no daemon)")
     one.add_argument("--duration", type=float, default=5.0)
     lang = sub.add_parser(
@@ -33,6 +34,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "daemon":
         from wayscribe.daemon import run
         return run()
+
+    if args.cmd == "doctor":
+        from wayscribe.doctor import run as doctor_run
+        return doctor_run()
 
     if args.cmd in ("toggle", "status", "stop", "cancel"):
         from wayscribe.ipc import send_command

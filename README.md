@@ -118,7 +118,8 @@ types itself into whatever window has focus — no paste needed.
 | Command | What it does |
 | --- | --- |
 | `wayscribe toggle` | Start recording if idle; stop and transcribe if recording. |
-| `wayscribe status` | Print the daemon state as JSON. |
+| `wayscribe status` | Print the daemon state + backend reachability as JSON. |
+| `wayscribe doctor` | Diagnose daemon, backend, output tools, and config. |
 | `wayscribe cancel` | Discard the current recording without transcribing. |
 | `wayscribe stop` | Tell the daemon to exit cleanly. |
 | `wayscribe oneshot --duration 5` | Record N seconds and print the transcript (no daemon). |
@@ -129,7 +130,8 @@ types itself into whatever window has focus — no paste needed.
 Quick smoke test once everything is up:
 
 ```bash
-wayscribe status              # {"ok": true, "state": "idle", "language": "ru"}
+wayscribe doctor              # checklist: daemon / backend / tools / config
+wayscribe status              # {"ok": true, "state": "idle", "backend": "up", ...}
 wayscribe oneshot --duration 3   # speak for 3 s, see the transcript printed
 ```
 
@@ -182,12 +184,35 @@ silently keeps the configured `language`.
 
 ## Troubleshooting
 
+First stop is `wayscribe doctor` — it checks the daemon, backend reachability,
+the configured model, the output tools, and the config file in one shot:
+
+```bash
+wayscribe doctor
+  daemon          ✓  running (idle)
+  backend         ✗  unreachable http://localhost:52625 — [Errno 111] Connection refused
+  model whisper…  ✗  backend down
+  wl-copy         ✓
+  wtype/ydotool   ✓  /usr/bin/wtype
+  notify-send     ✓
+  config          ✓  using defaults (no config.toml)
+```
+
+Live logs (the daemon is a systemd **user** service, so logs land in the user
+journal, not the system one):
+
+```bash
+journalctl --user -u wayscribe -f      # follow
+journalctl --user -u wayscribe -n 50   # last 50 lines
+```
+
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `wayscribe daemon not running` | Daemon not started | `systemctl --user start wayscribe` |
 | Transcription empty | Mic muted / wrong source | `pactl list sources short`, pick one, set `input_device` in the config |
 | Clipboard not updated | `wl-clipboard` missing | `sudo zypper install wl-clipboard` |
-| `FLM unreachable` / backend errors | Backend down or misconfigured | See [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
+| `backend unreachable` notification at login | Backend down at startup | `wayscribe doctor`, then [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
+| `FLM unreachable` / backend errors | Backend down or misconfigured | `wayscribe doctor`; see [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
 
 ## License
 

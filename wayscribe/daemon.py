@@ -17,7 +17,7 @@ import httpx
 from wayscribe import keyboard, output, vad
 from wayscribe.config import Config, socket_path
 from wayscribe.recorder import Recorder, silent_wav
-from wayscribe.transcriber import transcribe_async
+from wayscribe.transcriber import probe_async, transcribe_async
 
 log = logging.getLogger("wayscribe")
 
@@ -101,7 +101,13 @@ class Daemon:
         cmd = msg.get("cmd", "")
         async with self.lock:
             if cmd == "status":
-                return self._status_snapshot()
+                health = await probe_async(self.cfg)
+                return self._status_snapshot(
+                    {
+                        "endpoint": self.cfg.endpoint,
+                        "backend": "up" if health.reachable else "down",
+                    }
+                )
 
             if cmd == "stop":
                 self.stop_event.set()
@@ -256,8 +262,16 @@ class Daemon:
             log.info("FLM warmup OK")
         except httpx.ConnectError:
             log.warning("FLM warmup skipped: %s not reachable", self.cfg.endpoint)
+            output.notify(
+                "wayscribe",
+                f"backend unreachable at {self.cfg.endpoint} — run: wayscribe doctor",
+                icon="dialog-error",
+            )
         except Exception as exc:
             log.warning("FLM warmup failed: %s", exc)
+            output.notify(
+                "wayscribe", f"backend warmup failed: {exc}", icon="dialog-error"
+            )
 
 
 async def _client_handler(

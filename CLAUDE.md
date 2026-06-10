@@ -24,7 +24,7 @@ scripts/build-binary.sh                # PyInstaller --onefile -> dist/wayscribe
 scripts/build-rpm.sh                   # openSUSE RPM -> ~/rpmbuild/RPMS/x86_64/
 ```
 
-Runtime CLI: `wayscribe daemon|toggle|status|stop|cancel|oneshot|lang`. See
+Runtime CLI: `wayscribe daemon|toggle|status|stop|cancel|doctor|oneshot|lang`. See
 README for the full table. Tests use `pytest-asyncio` in `asyncio_mode = auto`.
 
 ## Architecture
