@@ -76,6 +76,10 @@ This installs `/usr/bin/wayscribe`, a systemd **user** unit, and a commented
 config template at
 `/usr/share/doc/packages/wayscribe/config.example.toml`.
 
+> The unit ships **disabled** — installing the RPM does not start the daemon.
+> Enable it in step 4 below. It runs as a *user* service (no `sudo`), so it
+> starts with your KDE login session and stops when you log out.
+
 ### 3. Start a transcription backend
 
 wayscribe needs an OpenAI-compatible STT server listening on `endpoint`
@@ -87,6 +91,13 @@ docker/compose setup and for using a different STT server.
 
 ```bash
 systemctl --user enable --now wayscribe
+```
+
+Verify it came up:
+
+```bash
+systemctl --user status wayscribe   # should read "active (running)"
+wayscribe status                    # prints {"state": "idle", ...}
 ```
 
 ### 5. Bind hotkeys
