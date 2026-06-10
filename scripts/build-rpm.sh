@@ -31,7 +31,11 @@ cp dist/flm-voice                "$TOP/SOURCES/flm-voice"
 cp packaging/flm-voice.service   "$TOP/SOURCES/flm-voice.service"
 cp LICENSE                       "$TOP/SOURCES/LICENSE"
 cp README.md                     "$TOP/SOURCES/README.md"
+cp BACKEND.md                    "$TOP/SOURCES/BACKEND.md"
 cp packaging/config.example.toml "$TOP/SOURCES/config.example.toml"
+# NPU backend compose, shipped as %doc so RPM users have it without the repo
+cp deploy/compose.yaml           "$TOP/SOURCES/compose.yaml"
+cp deploy/.env.example           "$TOP/SOURCES/env.example"
 
 echo ">>> Building RPM"
 rpmbuild -bb packaging/flm-voice.spec

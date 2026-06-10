@@ -1,211 +1,144 @@
-# whisper.npu — hotkey voice-to-text for KDE Plasma Wayland
+# flm-voice — hotkey voice-to-text for KDE Plasma Wayland
 
-Press a global hotkey, speak, press again. Audio is transcribed by
-Whisper V3 Turbo running on the AMD Ryzen AI NPU and the text lands in
-your clipboard (optionally typed into the focused window, with a KDE
-notification preview). Headless — no GUI windows; just a daemon, a Unix
-socket, and `notify-send`.
+Press a global hotkey, speak, press it again. Your audio is transcribed by
+**Whisper V3 Turbo** running on the **AMD Ryzen AI NPU**, and the text lands in
+your clipboard — optionally typed straight into the focused window, always with
+a KDE notification preview. Headless: no GUI windows, just a background daemon
+and a couple of hotkeys.
 
-## Backend
+**Targeted at KDE Plasma on Wayland**: input/output is Wayland-native
+(`wl-copy`, `wtype`, `notify-send`, KDE D-Bus). The transcription itself runs in
+a separate backend — built for the AMD Ryzen AI NPU, but the app only speaks
+plain HTTP, so any OpenAI-compatible speech-to-text server works. Backend setup,
+the NPU stack, and alternatives all live in **[BACKEND.md](BACKEND.md)**.
 
-Transcription runs in [fastflowlm-docker](../fastflowlm-docker/)
-as a long-running OpenAI-compatible API server on port `52625`:
+> Building from source, packaging, or hacking on the code? See
+> **[DEVELOPMENT.md](DEVELOPMENT.md)**. This README is for installing and using
+> the app.
 
-```bash
-docker run -d --rm \
-  --device=/dev/accel/accel0 \
-  --ulimit memlock=-1:-1 \
-  -v ~/.config/flm:/root/.config/flm \
-  -p 52625:52625 \
-  --restart unless-stopped \
-  --name flm-serve \
-  fastflowlm serve gemma3:1b --asr 1 --host 0.0.0.0
-```
-
-See [fastflowlm-docker README](../fastflowlm-docker/README.md)
-for NPU prerequisites, kernel driver setup, and the Docker image build.
-
-## Setup
-
-> For a compressed step-by-step checklist (new-machine bringup, package
-> install, hotkey wiring, smoke test, troubleshooting table), see
-> [SETUP.md](SETUP.md). The sections below have the same content with
-> more explanation.
-
-### 1. System packages
-
-```bash
-# openSUSE
-sudo zypper install wl-clipboard libnotify-tools
-# (optional, for keystroke auto-insert) sudo zypper install wtype
-```
-
-`notify-send` is usually already present on KDE.
-
-### 2. Python install
-
-```bash
-cd /home/vladislav/AI/ai370.npu/whisper.npu
-python3 -m venv .venv
-.venv/bin/pip install -e .
-```
-
-For a binary in `~/.local/bin` instead, use `pipx install .`.
-
-### 3. Start the FLM backend
-
-Either with the `docker run` shown above, or via the compose file in
-[deploy/compose.yaml](deploy/compose.yaml):
-
-```bash
-cd deploy
-cp .env.example .env       # then edit RENDER_GID for your host:
-                           #   getent group render | cut -d: -f3
-docker compose up -d
-docker compose logs -f
-```
-
-The compose file handles the NPU device, `memlock=-1`, the host's `render`
-group, the SELinux `:z` label for the bind-mounted model cache, and
-`restart: unless-stopped`. See its header for the full ownership story —
-short version: models land in `~/.config/flm` root-owned (that's how
-FLM's image expects to write to `$HOME=/root`); `sudo chown -R $USER ~/.config/flm`
-if you want to inspect them as your user.
-
-### 4. Run the flm-voice daemon
-
-In a terminal, or as a systemd `--user` unit
-([flm_voice/service/flm-voice.service](flm_voice/service/flm-voice.service)):
-
-```bash
-.venv/bin/flm-voice daemon
-# or
-cp flm_voice/service/flm-voice.service ~/.config/systemd/user/
-systemctl --user enable --now flm-voice
-```
-
-### 5. Bind hotkeys
-
-```bash
-./scripts/install-kde-hotkey.sh   # generates a .desktop launcher
-```
-
-Then in **System Settings → Shortcuts → Custom Shortcuts**, bind:
-
-- `Meta+Alt+Space` → `flm-voice toggle` *(start/stop recording)*
-- `Meta+Alt+L` → `flm-voice lang next` *(cycle language; notification shows the new value)*
-
-### 6. Talk
-
-Press the hotkey, speak, press again. Transcript goes to the clipboard
-and a notification pops up with a preview. Paste with `Ctrl+V`.
-
-## Architecture
+## How it works
 
 ```mermaid
 flowchart TD
     KDE["KDE Custom Shortcut<br/>(Meta+Alt+Space)"] -->|exec| Toggle["flm-voice toggle"]
     Toggle -->|Unix socket| Daemon["flm-voice daemon<br/>(asyncio)"]
-    Daemon --> Recorder["Recorder<br/>(sounddevice)"]
-    Daemon --> Transcriber["Transcriber<br/>(httpx → FLM)"]
-    Transcriber --> Output["Output:<br/>wl-copy / wtype / notify-send"]
+    Daemon --> Recorder["Recorder<br/>(microphone)"]
+    Daemon -->|WAV over HTTP| Backend["STT backend<br/>(Whisper on NPU by default)"]
+    Backend -->|transcript| Daemon
+    Daemon --> Output["clipboard · type · notification"]
 ```
 
-Key choices:
+1. The hotkey runs `flm-voice toggle`, a thin client that sends one command to
+   the long-lived **daemon** over a Unix socket — so the response is instant.
+2. First toggle starts recording the mic; second toggle stops and POSTs the WAV
+   to the **[transcription backend](BACKEND.md)** (Whisper on the NPU by default).
+3. The transcript fans out to your configured outputs: clipboard (`wl-copy`),
+   keystroke injection (`wtype`/`ydotool`), and a KDE notification.
 
-- **Long-lived daemon.** `flm-voice toggle` is a thin client sending one
-  JSON line to `$XDG_RUNTIME_DIR/flm-voice.sock`. The daemon holds the
-  PortAudio stream and a tiny state machine
-  (`IDLE → RECORDING → TRANSCRIBING → IDLE`), so toggle response is
-  immediate.
-- **No local model.** Transcription is `POST /v1/audio/transcriptions`
-  against the FLM container; the NPU integration lives entirely there.
-- **Wayland-native I/O.** Clipboard via `wl-copy`, optional keystroke
-  injection via `wtype`/`ydotool`, KDE notifications via `notify-send`.
-  No X11 assumptions, no display server queries.
-- **Safety rails.** A `max_duration_sec` watchdog stops a forgotten
-  recording; an opt-in energy-based VAD (`auto_stop = true`) stops
-  recording after `auto_stop_silence_sec` of silence following speech.
-  A startup warm-up POST primes FLM so the first real transcription
-  doesn't pay the cold-load cost.
+The daemon holds a small state machine (`IDLE → RECORDING → TRANSCRIBING →
+IDLE`). Safety rails: a max-duration watchdog auto-stops a forgotten recording,
+and an opt-in silence detector can stop recording for you after you stop
+talking.
 
-### Measured latency (Strix Point HX 370)
+## Requirements
 
-| Audio | Round-trip via `/v1/audio/transcriptions` |
-| --- | --- |
-| 1 s (silent WAV) | ~2.2 s — base per-request overhead |
-| 5 s of speech | ~3.5 s (extrapolated) |
-| 10 s of speech | ~4.0 s (extrapolated) |
-| 30 s JFK clip | 5.1–5.5 s (3 consecutive runs) |
+- **KDE Plasma on Wayland.** Packaged as an openSUSE RPM.
+- **A transcription backend** reachable over HTTP — the FLM container running
+  Whisper on the NPU, or any OpenAI-compatible STT. See [BACKEND.md](BACKEND.md).
+- **Runtime dependencies** (the RPM pulls these in):
 
-Throughput is ~6× real-time. The flat ~2 s overhead per call dominates
-short utterances; the per-second processing cost is small. Note: feeding
-FLM pure silence yields short hallucinations (`*Police*`, `E aí E aí…`);
-the daemon's warm-up uses 1 s of silence and discards the result.
+| Package | Role | Required? |
+| --- | --- | --- |
+| `libportaudio2` | microphone capture | **yes** |
+| `wl-clipboard` | copy transcript (`wl-copy`) | recommended |
+| `libnotify-tools` | KDE notification (`notify-send`) | recommended |
+| `wtype` *or* `ydotool` | type into focused window (`auto_type`) | optional |
 
-## Project layout
+## Installation
 
-```text
-whisper.npu/
-├── pyproject.toml
-├── README.md
-├── SETUP.md                    # new-machine bringup checklist
-├── flm_voice/
-│   ├── __main__.py             # CLI: daemon | toggle | status | stop | cancel | oneshot | lang
-│   ├── config.py               # XDG config + socket path
-│   ├── ipc.py                  # line-delimited JSON over Unix socket (client)
-│   ├── daemon.py               # asyncio IPC server + state machine + watchdogs
-│   ├── recorder.py             # sounddevice → 16kHz mono WAV bytes
-│   ├── transcriber.py          # httpx client for FLM serve
-│   ├── output.py               # wl-copy / wtype / ydotool / notify-send
-│   ├── vad.py                  # energy-based has_speech (pure numpy)
-│   └── service/
-│       └── flm-voice.service   # systemd --user unit
-├── deploy/
-│   ├── compose.yaml            # FLM backend (Whisper + LLM on the NPU)
-│   └── .env.example            # RENDER_GID / FLM_PORT / FLM_LLM_MODEL
-├── packaging/
-│   ├── flm-voice.service       # unit shipped in the RPM
-│   ├── flm-voice.spec          # rpmbuild spec
-│   └── config.example.toml     # reference config shipped as %doc
-├── scripts/
-│   ├── install-kde-hotkey.sh   # register Custom Shortcut helper
-│   ├── bench_transcribe.py     # latency smoke test against FLM serve
-│   ├── build-binary.sh         # PyInstaller --onefile -> dist/flm-voice
-│   └── build-rpm.sh            # binary -> ~/rpmbuild/RPMS/x86_64/*.rpm
-└── tests/
-    ├── test_language.py
-    ├── test_recorder.py
-    ├── test_skeleton.py
-    └── test_vad.py
+### 1. System dependencies
+
+```bash
+sudo zypper install libportaudio2 wl-clipboard libnotify-tools
+# optional, for keystroke auto-insert:
+sudo zypper install wtype
 ```
 
-## CLI
+`notify-send` is normally already present on KDE.
+
+### 2. Install the package
+
+```bash
+sudo zypper install ./flm-voice-*.rpm
+```
+
+This installs `/usr/bin/flm-voice`, a systemd **user** unit, and a commented
+config template at
+`/usr/share/doc/packages/flm-voice/config.example.toml`.
+
+### 3. Start a transcription backend
+
+flm-voice needs an OpenAI-compatible STT server listening on `endpoint`
+(default `http://localhost:52625`). The reference backend is Whisper on the AMD
+Ryzen AI NPU via the FLM container — **see [BACKEND.md](BACKEND.md)** for the
+docker/compose setup and for using a different STT server.
+
+### 4. Enable the daemon
+
+```bash
+systemctl --user enable --now flm-voice
+```
+
+### 5. Bind hotkeys
+
+In **System Settings → Shortcuts → Custom Shortcuts**, add commands and bind:
+
+- `Meta+Alt+Space` → `flm-voice toggle` *(start/stop recording)*
+- `Meta+Alt+L` → `flm-voice lang next` *(cycle language; optional)*
+
+> `Meta+Space` is Krunner — that's why the default is `Meta+Alt+Space`.
+
+## Usage
+
+Press the hotkey, speak, press it again. The transcript goes to your clipboard
+and a notification shows a preview. Paste with `Ctrl+V`. With `auto_type` on, it
+types itself into whatever window has focus — no paste needed.
 
 | Command | What it does |
 | --- | --- |
-| `flm-voice daemon` | Run the long-lived daemon in the foreground (for systemd or a terminal). |
 | `flm-voice toggle` | Start recording if idle; stop and transcribe if recording. |
 | `flm-voice status` | Print the daemon state as JSON. |
 | `flm-voice cancel` | Discard the current recording without transcribing. |
 | `flm-voice stop` | Tell the daemon to exit cleanly. |
 | `flm-voice oneshot --duration 5` | Record N seconds and print the transcript (no daemon). |
 | `flm-voice lang` | Show the current transcription language. |
-| `flm-voice lang next` | Cycle to the next language in `cfg.languages`. |
-| `flm-voice lang ru` / `en` / `auto` | Set the language explicitly; `auto` clears the hint so Whisper detects. |
+| `flm-voice lang next` | Cycle to the next language in `languages`. |
+| `flm-voice lang ru` / `en` / `auto` | Set the language; `auto` lets Whisper detect it. |
+
+Quick smoke test once everything is up:
+
+```bash
+flm-voice status              # {"ok": true, "state": "idle", "language": "ru"}
+flm-voice oneshot --duration 3   # speak for 3 s, see the transcript printed
+```
 
 ## Configuration
 
-Optional `$XDG_CONFIG_HOME/flm-voice/config.toml`. The RPM ships a
-commented template at `/usr/share/doc/packages/flm-voice/config.example.toml`
-— copy it to `~/.config/flm-voice/config.toml` and edit. Keys (defaults shown):
+Optional `~/.config/flm-voice/config.toml`. Copy the shipped template and edit
+it — defaults work with no file at all:
+
+```bash
+cp /usr/share/doc/packages/flm-voice/config.example.toml ~/.config/flm-voice/config.toml
+```
+
+Keys (defaults shown):
 
 ```toml
-endpoint = "http://localhost:52625"   # or a LAN host, e.g. "http://192.168.1.50:52625"
-model = "whisper-v3:turbo"
+endpoint = "http://localhost:52625"   # STT backend; see BACKEND.md
+model = "whisper-v3:turbo"            # model name the backend expects
 request_timeout_sec = 60.0            # HTTP timeout per transcription POST
-language = "ru"                       # ISO-639-1; default "ru" — `flm-voice lang auto` for auto-detect
-language_from_layout = true           # default on: follow the active KDE keyboard layout per recording
+language = "ru"                       # ISO-639-1; `flm-voice lang auto` for auto-detect
+language_from_layout = true           # follow the active KDE keyboard layout per recording
 languages = ["ru", "en"]              # cycled by `flm-voice lang next`
 sample_rate = 16000
 # input_device = "alsa_input.pci-0000_..."
@@ -220,79 +153,31 @@ auto_stop_min_record_sec = 0.8        # never auto-stop in the first N seconds
 vad_rms_threshold = 500.0             # higher = needs louder speech
 ```
 
-## Notes
+`endpoint` and `model` select the transcription backend — point them at a LAN
+host, whisper.cpp/faster-whisper, or OpenAI itself. See [BACKEND.md](BACKEND.md).
 
-- **PipeWire vs PortAudio.** `sounddevice` finds PipeWire via the ALSA
-  shim on every modern distro this has been tried on. If it ever
-  doesn't, the fallback is to spawn `pw-record -f s16 -r 16000 --channels=1 -`
-  and read stdout — a ~20-line change in `recorder.py`.
-- **Hotkey conflicts.** `Meta+Space` is Krunner. Default suggestion is
-  `Meta+Alt+Space`; override with `FLM_VOICE_HOTKEY=` before running the
-  install script.
-- **FLM container must be up.** The `--restart unless-stopped` flag in
-  the docker invocation means it survives reboots. Without it, the
-  daemon's first `toggle` will get a clean `FLM unreachable` notification
-  and stay idle (it won't crash).
-- **Auto-type into the focused window** (`auto_type = true`, or add `"type"`
-  to `outputs`). Synthesizes keystrokes via `wtype` (Wayland) or `ydotool`,
-  typing the transcript wherever focus is when transcription finishes — no
-  manual paste. Needs `wtype`/`ydotool` installed; raises (and is logged) if
-  neither is present. Reliable because nothing steals focus between the stop
-  hotkey and the result; clipboard stays as a fallback if you keep it in
-  `outputs`.
-- **Language follows keyboard layout** (`language_from_layout`, on by
-  default). At each recording start the daemon reads the active KDE layout
-  from KWin's `org.kde.KeyboardLayouts` D-Bus interface (via `gdbus`) and
-  maps the xkb code to ISO-639-1 (`us`/`gb` → `en`, others pass through),
-  so the `Meta+Alt+L` lang hotkey is usually unnecessary. Best-effort: on a
-  non-KDE session, no session bus, or missing `gdbus` it silently keeps the
-  configured `language`. While on, manual `flm-voice lang` changes are
-  overwritten on the next recording — set `language_from_layout = false` to
-  pin the language manually.
+**Auto-type into the focused window** — set `auto_type = true` (or add `"type"`
+to `outputs`). Synthesizes keystrokes via `wtype` (Wayland) or `ydotool`, typing
+the transcript wherever focus is when transcription finishes. Needs
+`wtype`/`ydotool` installed. Keep `clipboard` in `outputs` as a fallback.
 
-## Development
+**Language follows keyboard layout** — with `language_from_layout = true` (the
+default), at each recording start the daemon reads the active KDE layout and
+maps it to a language (`us`/`gb` → `en`, others pass through), so the
+`Meta+Alt+L` hotkey is usually unnecessary. While this is on, manual
+`flm-voice lang` changes are overwritten on the next recording — set it to
+`false` to pin the language yourself. Best-effort: on a non-KDE session it
+silently keeps the configured `language`.
 
-```bash
-.venv/bin/pip install -e .[dev]
-.venv/bin/pytest -q
-```
+## Troubleshooting
 
-## Standalone binary
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `flm-voice daemon not running` | Daemon not started | `systemctl --user start flm-voice` |
+| Transcription empty | Mic muted / wrong source | `pactl list sources short`, pick one, set `input_device` in the config |
+| Clipboard not updated | `wl-clipboard` missing | `sudo zypper install wl-clipboard` |
+| `FLM unreachable` / backend errors | Backend down or misconfigured | See [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
 
-To produce a single self-contained executable (no Python, no venv required
-on the target machine — only `libportaudio.so.2` plus whichever output
-tools you use):
+## License
 
-```bash
-scripts/build-binary.sh
-# -> dist/flm-voice  (~30 MB)
-```
-
-The script uses PyInstaller in `--onefile` mode. Drop `dist/flm-voice` into
-`~/.local/bin/`, point your systemd unit's `ExecStart=` at it, and the
-Python source tree is no longer needed at runtime.
-
-## RPM package (openSUSE)
-
-For installing system-wide via the package manager:
-
-```bash
-sudo zypper install rpm-build      # one-time
-scripts/build-rpm.sh
-sudo zypper install ~/rpmbuild/RPMS/x86_64/flm-voice-*.rpm
-```
-
-The package installs:
-
-- `/usr/bin/flm-voice` — the PyInstaller binary
-- `/usr/lib/systemd/user/flm-voice.service` — systemd user unit
-- `/usr/share/doc/packages/flm-voice/README.md`
-- `/usr/share/licenses/flm-voice/LICENSE`
-
-Hard dep: `libportaudio2`. Soft deps (`Recommends:`):
-`wl-clipboard`, `libnotify-tools`. After install:
-
-```bash
-systemctl --user enable --now flm-voice
-./scripts/install-kde-hotkey.sh   # prints hotkey-binding steps
-```
+See [LICENSE](LICENSE).

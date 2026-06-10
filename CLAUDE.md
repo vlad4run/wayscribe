@@ -78,4 +78,4 @@ Confirmed on Strix Point HX 370 that **no LLM fits alongside Whisper** in one FL
 container — not even the smallest catalog model, and `--pmode turbo` doesn't
 help. This is harmless for flm-voice (transcription is unaffected). To also use
 `/v1/chat/completions`, run a *second* FLM container without `--asr 1`. See the
-troubleshooting table in `SETUP.md` for the exact error signatures.
+troubleshooting table in `BACKEND.md` for the exact error signatures.
