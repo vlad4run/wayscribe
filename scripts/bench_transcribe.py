@@ -8,8 +8,8 @@ from __future__ import annotations
 import argparse
 import time
 
-from flm_voice.recorder import record_to_wav
-from flm_voice.transcriber import transcribe_sync
+from wayscribe.recorder import record_to_wav
+from wayscribe.transcriber import transcribe_sync
 
 
 def main() -> int:

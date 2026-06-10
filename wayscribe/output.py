@@ -29,7 +29,7 @@ def type_text(text: str) -> None:
 def notify(title: str, body: str = "", icon: str = "audio-input-microphone") -> None:
     try:
         subprocess.run(
-            ["notify-send", "--app-name=flm-voice", "--icon", icon, title, body],
+            ["notify-send", "--app-name=wayscribe", "--icon", icon, title, body],
             check=False,
         )
     except FileNotFoundError:

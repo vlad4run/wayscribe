@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import httpx
 
-from flm_voice.config import Config
+from wayscribe.config import Config
 
 
 def transcribe_sync(wav: bytes, cfg: Config | None = None) -> str:

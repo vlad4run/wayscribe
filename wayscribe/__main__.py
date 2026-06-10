@@ -1,4 +1,4 @@
-"""flm-voice CLI: daemon | toggle | status | stop | cancel | oneshot | lang."""
+"""wayscribe CLI: daemon | toggle | status | stop | cancel | oneshot | lang."""
 from __future__ import annotations
 
 import argparse
@@ -6,7 +6,7 @@ import sys
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="flm-voice")
+    parser = argparse.ArgumentParser(prog="wayscribe")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("daemon", help="Run the long-lived daemon (foreground; for systemd)")
     sub.add_parser("toggle", help="Toggle recording (start if idle, stop if recording)")
@@ -31,15 +31,15 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     if args.cmd == "daemon":
-        from flm_voice.daemon import run
+        from wayscribe.daemon import run
         return run()
 
     if args.cmd in ("toggle", "status", "stop", "cancel"):
-        from flm_voice.ipc import send_command
+        from wayscribe.ipc import send_command
         return send_command(args.cmd)
 
     if args.cmd == "lang":
-        from flm_voice.ipc import send_command
+        from wayscribe.ipc import send_command
         if args.value is None:
             return send_command("status")
         if args.value == "next":
@@ -47,8 +47,8 @@ def main(argv: list[str] | None = None) -> int:
         return send_command("lang_set", value=args.value)
 
     if args.cmd == "oneshot":
-        from flm_voice.recorder import record_to_wav
-        from flm_voice.transcriber import transcribe_sync
+        from wayscribe.recorder import record_to_wav
+        from wayscribe.transcriber import transcribe_sync
         wav = record_to_wav(duration=args.duration)
         print(transcribe_sync(wav))
         return 0

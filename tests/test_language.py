@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import pytest
 
-from flm_voice.config import Config
-from flm_voice.daemon import Daemon
+from wayscribe.config import Config
+from wayscribe.daemon import Daemon
 
 
 @pytest.fixture(autouse=True)
 def _silence_notify(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("flm_voice.output.notify", lambda *a, **kw: None)
+    monkeypatch.setattr("wayscribe.output.notify", lambda *a, **kw: None)
 
 
 def test_set_explicit_language() -> None:

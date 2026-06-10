@@ -1,4 +1,4 @@
-# flm-voice — hotkey voice-to-text for KDE Plasma Wayland
+# wayscribe — hotkey voice-to-text for KDE Plasma Wayland
 
 Press a global hotkey, speak, press it again. Your audio is transcribed by
 **Whisper V3 Turbo** running on the **AMD Ryzen AI NPU**, and the text lands in
@@ -20,15 +20,15 @@ the NPU stack, and alternatives all live in **[BACKEND.md](BACKEND.md)**.
 
 ```mermaid
 flowchart TD
-    KDE["KDE Custom Shortcut<br/>(Meta+Alt+Space)"] -->|exec| Toggle["flm-voice toggle"]
-    Toggle -->|Unix socket| Daemon["flm-voice daemon<br/>(asyncio)"]
+    KDE["KDE Custom Shortcut<br/>(Meta+Alt+Space)"] -->|exec| Toggle["wayscribe toggle"]
+    Toggle -->|Unix socket| Daemon["wayscribe daemon<br/>(asyncio)"]
     Daemon --> Recorder["Recorder<br/>(microphone)"]
     Daemon -->|WAV over HTTP| Backend["STT backend<br/>(Whisper on NPU by default)"]
     Backend -->|transcript| Daemon
     Daemon --> Output["clipboard · type · notification"]
 ```
 
-1. The hotkey runs `flm-voice toggle`, a thin client that sends one command to
+1. The hotkey runs `wayscribe toggle`, a thin client that sends one command to
    the long-lived **daemon** over a Unix socket — so the response is instant.
 2. First toggle starts recording the mic; second toggle stops and POSTs the WAV
    to the **[transcription backend](BACKEND.md)** (Whisper on the NPU by default).
@@ -69,16 +69,16 @@ sudo zypper install wtype
 ### 2. Install the package
 
 ```bash
-sudo zypper install ./flm-voice-*.rpm
+sudo zypper install ./wayscribe-*.rpm
 ```
 
-This installs `/usr/bin/flm-voice`, a systemd **user** unit, and a commented
+This installs `/usr/bin/wayscribe`, a systemd **user** unit, and a commented
 config template at
-`/usr/share/doc/packages/flm-voice/config.example.toml`.
+`/usr/share/doc/packages/wayscribe/config.example.toml`.
 
 ### 3. Start a transcription backend
 
-flm-voice needs an OpenAI-compatible STT server listening on `endpoint`
+wayscribe needs an OpenAI-compatible STT server listening on `endpoint`
 (default `http://localhost:52625`). The reference backend is Whisper on the AMD
 Ryzen AI NPU via the FLM container — **see [BACKEND.md](BACKEND.md)** for the
 docker/compose setup and for using a different STT server.
@@ -86,15 +86,15 @@ docker/compose setup and for using a different STT server.
 ### 4. Enable the daemon
 
 ```bash
-systemctl --user enable --now flm-voice
+systemctl --user enable --now wayscribe
 ```
 
 ### 5. Bind hotkeys
 
 In **System Settings → Shortcuts → Custom Shortcuts**, add commands and bind:
 
-- `Meta+Alt+Space` → `flm-voice toggle` *(start/stop recording)*
-- `Meta+Alt+L` → `flm-voice lang next` *(cycle language; optional)*
+- `Meta+Alt+Space` → `wayscribe toggle` *(start/stop recording)*
+- `Meta+Alt+L` → `wayscribe lang next` *(cycle language; optional)*
 
 > `Meta+Space` is Krunner — that's why the default is `Meta+Alt+Space`.
 
@@ -106,29 +106,29 @@ types itself into whatever window has focus — no paste needed.
 
 | Command | What it does |
 | --- | --- |
-| `flm-voice toggle` | Start recording if idle; stop and transcribe if recording. |
-| `flm-voice status` | Print the daemon state as JSON. |
-| `flm-voice cancel` | Discard the current recording without transcribing. |
-| `flm-voice stop` | Tell the daemon to exit cleanly. |
-| `flm-voice oneshot --duration 5` | Record N seconds and print the transcript (no daemon). |
-| `flm-voice lang` | Show the current transcription language. |
-| `flm-voice lang next` | Cycle to the next language in `languages`. |
-| `flm-voice lang ru` / `en` / `auto` | Set the language; `auto` lets Whisper detect it. |
+| `wayscribe toggle` | Start recording if idle; stop and transcribe if recording. |
+| `wayscribe status` | Print the daemon state as JSON. |
+| `wayscribe cancel` | Discard the current recording without transcribing. |
+| `wayscribe stop` | Tell the daemon to exit cleanly. |
+| `wayscribe oneshot --duration 5` | Record N seconds and print the transcript (no daemon). |
+| `wayscribe lang` | Show the current transcription language. |
+| `wayscribe lang next` | Cycle to the next language in `languages`. |
+| `wayscribe lang ru` / `en` / `auto` | Set the language; `auto` lets Whisper detect it. |
 
 Quick smoke test once everything is up:
 
 ```bash
-flm-voice status              # {"ok": true, "state": "idle", "language": "ru"}
-flm-voice oneshot --duration 3   # speak for 3 s, see the transcript printed
+wayscribe status              # {"ok": true, "state": "idle", "language": "ru"}
+wayscribe oneshot --duration 3   # speak for 3 s, see the transcript printed
 ```
 
 ## Configuration
 
-Optional `~/.config/flm-voice/config.toml`. Copy the shipped template and edit
+Optional `~/.config/wayscribe/config.toml`. Copy the shipped template and edit
 it — defaults work with no file at all:
 
 ```bash
-cp /usr/share/doc/packages/flm-voice/config.example.toml ~/.config/flm-voice/config.toml
+cp /usr/share/doc/packages/wayscribe/config.example.toml ~/.config/wayscribe/config.toml
 ```
 
 Keys (defaults shown):
@@ -137,9 +137,9 @@ Keys (defaults shown):
 endpoint = "http://localhost:52625"   # STT backend; see BACKEND.md
 model = "whisper-v3:turbo"            # model name the backend expects
 request_timeout_sec = 60.0            # HTTP timeout per transcription POST
-language = "ru"                       # ISO-639-1; `flm-voice lang auto` for auto-detect
+language = "ru"                       # ISO-639-1; `wayscribe lang auto` for auto-detect
 language_from_layout = true           # follow the active KDE keyboard layout per recording
-languages = ["ru", "en"]              # cycled by `flm-voice lang next`
+languages = ["ru", "en"]              # cycled by `wayscribe lang next`
 sample_rate = 16000
 # input_device = "alsa_input.pci-0000_..."
 outputs = ["clipboard", "notify"]     # also: "type" (wtype/ydotool)
@@ -165,7 +165,7 @@ the transcript wherever focus is when transcription finishes. Needs
 default), at each recording start the daemon reads the active KDE layout and
 maps it to a language (`us`/`gb` → `en`, others pass through), so the
 `Meta+Alt+L` hotkey is usually unnecessary. While this is on, manual
-`flm-voice lang` changes are overwritten on the next recording — set it to
+`wayscribe lang` changes are overwritten on the next recording — set it to
 `false` to pin the language yourself. Best-effort: on a non-KDE session it
 silently keeps the configured `language`.
 
@@ -173,7 +173,7 @@ silently keeps the configured `language`.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `flm-voice daemon not running` | Daemon not started | `systemctl --user start flm-voice` |
+| `wayscribe daemon not running` | Daemon not started | `systemctl --user start wayscribe` |
 | Transcription empty | Mic muted / wrong source | `pactl list sources short`, pick one, set `input_device` in the config |
 | Clipboard not updated | `wl-clipboard` missing | `sudo zypper install wl-clipboard` |
 | `FLM unreachable` / backend errors | Backend down or misconfigured | See [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |

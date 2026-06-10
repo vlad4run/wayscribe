@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import pytest
 
-from flm_voice import keyboard
-from flm_voice.config import Config
-from flm_voice.daemon import Daemon
+from wayscribe import keyboard
+from wayscribe.config import Config
+from wayscribe.daemon import Daemon
 
 _LIST = "([('us', '', 'English (US)'), ('ru', '', 'Russian (typewriter)')],)\n"
 

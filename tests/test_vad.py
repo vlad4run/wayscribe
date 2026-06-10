@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from flm_voice import vad
+from wayscribe import vad
 
 
 def test_silence_is_not_speech() -> None:

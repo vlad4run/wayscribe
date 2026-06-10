@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from flm_voice.recorder import Recorder, silent_wav
+from wayscribe.recorder import Recorder, silent_wav
 
 
 def test_silent_wav_has_correct_header_and_length() -> None:

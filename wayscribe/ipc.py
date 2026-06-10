@@ -1,6 +1,6 @@
 """Line-delimited JSON over Unix socket: client side.
 
-Server-side handler lives in `flm_voice.daemon`.
+Server-side handler lives in `wayscribe.daemon`.
 """
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import socket
 import sys
 from typing import Any
 
-from flm_voice.config import socket_path
+from wayscribe.config import socket_path
 
 
 def send_command(cmd: str, **kwargs: Any) -> int:
@@ -27,14 +27,14 @@ def send_command(cmd: str, **kwargs: Any) -> int:
                     break
                 buf += chunk
     except (FileNotFoundError, ConnectionRefusedError):
-        print(f"flm-voice daemon not running (socket: {sock_path})", file=sys.stderr)
+        print(f"wayscribe daemon not running (socket: {sock_path})", file=sys.stderr)
         return 2
     except OSError as exc:
-        print(f"flm-voice ipc error: {exc}", file=sys.stderr)
+        print(f"wayscribe ipc error: {exc}", file=sys.stderr)
         return 2
 
     if not buf:
-        print("flm-voice daemon closed the connection without a reply", file=sys.stderr)
+        print("wayscribe daemon closed the connection without a reply", file=sys.stderr)
         return 2
 
     response = json.loads(buf.decode())

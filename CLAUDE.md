@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`flm-voice`: hotkey voice-to-text for KDE Plasma Wayland. A KDE global shortcut
-runs `flm-voice toggle`; a long-lived daemon records the mic, ships the audio to
+`wayscribe`: hotkey voice-to-text for KDE Plasma Wayland. A KDE global shortcut
+runs `wayscribe toggle`; a long-lived daemon records the mic, ships the audio to
 a **FastFlowLM (FLM) container** that runs Whisper V3 Turbo on an AMD Ryzen AI
 NPU, and drops the transcript into the clipboard / focused window / a KDE
 notification. Headless: no GUI, just a daemon + Unix socket + `notify-send`.
@@ -20,16 +20,16 @@ notification. Headless: no GUI, just a daemon + Unix socket + `notify-send`.
 .venv/bin/ruff format .                # format
 
 scripts/bench_transcribe.py            # latency smoke test vs a running FLM
-scripts/build-binary.sh                # PyInstaller --onefile -> dist/flm-voice (~30MB)
+scripts/build-binary.sh                # PyInstaller --onefile -> dist/wayscribe (~30MB)
 scripts/build-rpm.sh                   # openSUSE RPM -> ~/rpmbuild/RPMS/x86_64/
 ```
 
-Runtime CLI: `flm-voice daemon|toggle|status|stop|cancel|oneshot|lang`. See
+Runtime CLI: `wayscribe daemon|toggle|status|stop|cancel|oneshot|lang`. See
 README for the full table. Tests use `pytest-asyncio` in `asyncio_mode = auto`.
 
 ## Architecture
 
-Two processes, split across a Unix socket at `$XDG_RUNTIME_DIR/flm-voice.sock`:
+Two processes, split across a Unix socket at `$XDG_RUNTIME_DIR/wayscribe.sock`:
 
 - **Thin client** (`ipc.py`, invoked by `toggle`/`status`/`stop`/`cancel`/`lang`):
   sends one line-delimited JSON command, reads one JSON reply, exits. No state.
@@ -68,7 +68,7 @@ Key invariants worth knowing before editing:
 ## Config
 
 `Config` dataclass (`config.py`) loaded from
-`$XDG_CONFIG_HOME/flm-voice/config.toml`; unknown keys are warned-and-ignored.
+`$XDG_CONFIG_HOME/wayscribe/config.toml`; unknown keys are warned-and-ignored.
 Defaults are usable with no config file. Full key reference is in README.
 
 ## Hardware constraint (don't re-investigate)
@@ -76,6 +76,6 @@ Defaults are usable with no config file. Full key reference is in README.
 The NPU has **8 columns**, and Whisper V3 Turbo alone consumes the whole budget.
 Confirmed on Strix Point HX 370 that **no LLM fits alongside Whisper** in one FLM
 container — not even the smallest catalog model, and `--pmode turbo` doesn't
-help. This is harmless for flm-voice (transcription is unaffected). To also use
+help. This is harmless for wayscribe (transcription is unaffected). To also use
 `/v1/chat/completions`, run a *second* FLM container without `--asr 1`. See the
 troubleshooting table in `BACKEND.md` for the exact error signatures.

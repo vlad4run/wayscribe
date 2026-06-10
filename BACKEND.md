@@ -1,10 +1,10 @@
 # Transcription backend
 
-flm-voice does **no transcription itself**. On each toggle it POSTs the recorded
+wayscribe does **no transcription itself**. On each toggle it POSTs the recorded
 WAV to an OpenAI-compatible `/v1/audio/transcriptions` endpoint and reads the
 `text` field of the JSON reply. Everything below that HTTP boundary — the model,
 the hardware — is swappable. You choose which server it talks to with two keys
-in `~/.config/flm-voice/config.toml`:
+in `~/.config/wayscribe/config.toml`:
 
 ```toml
 endpoint = "http://localhost:52625"   # where the STT server listens
@@ -18,7 +18,7 @@ model    = "whisper-v3:turbo"          # the model name that server expects
 
 ## Default: Whisper on the AMD Ryzen AI NPU
 
-This is what flm-voice was built for: **Whisper V3 Turbo on the AMD Ryzen AI
+This is what wayscribe was built for: **Whisper V3 Turbo on the AMD Ryzen AI
 NPU**, served by the FastFlowLM (FLM) container — the sibling repo
 [`../fastflowlm-docker/`](../fastflowlm-docker/), an OpenAI-compatible API server
 on port `52625`.
@@ -64,11 +64,11 @@ docker run -d --rm \
 
 …or via the bundled compose file. In the repo it's `deploy/`; the RPM ships it
 as the **NPU backend** compose at
-`/usr/share/doc/packages/flm-voice/deploy-npu/` (copy it somewhere writable
+`/usr/share/doc/packages/wayscribe/deploy-npu/` (copy it somewhere writable
 first). Then:
 
 ```bash
-cd deploy        # or: cd /usr/share/doc/packages/flm-voice/deploy-npu
+cd deploy        # or: cd /usr/share/doc/packages/wayscribe/deploy-npu
 cp .env.example .env
 # set RENDER_GID to your host's render group:
 sed -i "s/^RENDER_GID=.*/RENDER_GID=$(getent group render | cut -d: -f3)/" .env
@@ -88,7 +88,7 @@ model    = "whisper-v3:turbo"
 
 ## Any OpenAI-compatible STT
 
-Because the NPU lives entirely behind the HTTP call, you can point flm-voice at
+Because the NPU lives entirely behind the HTTP call, you can point wayscribe at
 **any** server that speaks `/v1/audio/transcriptions` and drop the NPU/FLM stack
 altogether — just change the two keys:
 

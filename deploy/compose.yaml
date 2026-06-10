@@ -1,5 +1,5 @@
 # FastFlowLM serving Whisper V3 Turbo (ASR) + an LLM on the AMD Ryzen AI NPU.
-# Pairs with the flm-voice client (see ../README.md).
+# Pairs with the wayscribe client (see ../README.md).
 #
 # Quick start:
 #   cp .env.example .env       # then edit RENDER_GID for your host

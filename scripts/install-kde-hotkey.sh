@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Print the steps to bind `flm-voice toggle` to a global hotkey in KDE
+# Print the steps to bind `wayscribe toggle` to a global hotkey in KDE
 # Plasma 6. KDE's khotkeys config is not safe to edit from scripts, so the
-# binding itself is done via System Settings. Override FLM_VOICE_HOTKEY to
+# binding itself is done via System Settings. Override WAYSCRIBE_HOTKEY to
 # change the suggested combo.
 set -euo pipefail
 
-HOTKEY="${FLM_VOICE_HOTKEY:-Meta+Alt+Space}"
-LANG_HOTKEY="${FLM_VOICE_LANG_HOTKEY:-Meta+Alt+L}"
-BIN="$(command -v flm-voice || true)"
+HOTKEY="${WAYSCRIBE_HOTKEY:-Meta+Alt+Space}"
+LANG_HOTKEY="${WAYSCRIBE_LANG_HOTKEY:-Meta+Alt+L}"
+BIN="$(command -v wayscribe || true)"
 if [ -z "$BIN" ]; then
-    echo "flm-voice not in PATH — install the package first (pip install -e .)" >&2
+    echo "wayscribe not in PATH — install the package first (pip install -e .)" >&2
     exit 1
 fi
 
@@ -28,5 +28,5 @@ Language cycle (optional):
   Action:   ${BIN} lang next
 
 Then start the daemon:
-  systemctl --user enable --now flm-voice
+  systemctl --user enable --now wayscribe
 MSG

@@ -1,4 +1,4 @@
-"""Configuration loaded from $XDG_CONFIG_HOME/flm-voice/config.toml."""
+"""Configuration loaded from $XDG_CONFIG_HOME/wayscribe/config.toml."""
 from __future__ import annotations
 
 import logging
@@ -12,16 +12,16 @@ log = logging.getLogger(__name__)
 
 def config_dir() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "flm-voice"
+    return Path(base) / "wayscribe"
 
 
 def runtime_dir() -> Path:
-    base = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/flm-voice-{os.getuid()}"
+    base = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/wayscribe-{os.getuid()}"
     return Path(base)
 
 
 def socket_path() -> Path:
-    return runtime_dir() / "flm-voice.sock"
+    return runtime_dir() / "wayscribe.sock"
 
 
 @dataclass

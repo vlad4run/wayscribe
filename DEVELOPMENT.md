@@ -1,6 +1,6 @@
 # Development & packaging
 
-For building flm-voice from source, running the tests, and producing the binary
+For building wayscribe from source, running the tests, and producing the binary
 / RPM. End users want [README.md](README.md) instead.
 
 ## Project layout
@@ -10,7 +10,7 @@ whisper.npu/
 ├── pyproject.toml
 ├── README.md                   # user-facing install & usage guide
 ├── DEVELOPMENT.md              # this file
-├── flm_voice/
+├── wayscribe/
 │   ├── __main__.py             # CLI: daemon | toggle | status | stop | cancel | oneshot | lang
 │   ├── config.py               # XDG config + socket path
 │   ├── ipc.py                  # line-delimited JSON over Unix socket (client)
@@ -21,18 +21,18 @@ whisper.npu/
 │   ├── keyboard.py             # active KDE layout → ISO-639-1 (gdbus)
 │   ├── vad.py                  # energy-based has_speech (pure numpy)
 │   └── service/
-│       └── flm-voice.service   # systemd --user unit
+│       └── wayscribe.service   # systemd --user unit
 ├── deploy/
 │   ├── compose.yaml            # FLM backend on the NPU, port 52625
 │   └── .env.example            # RENDER_GID / FLM_PORT / FLM_LLM_MODEL
 ├── packaging/
-│   ├── flm-voice.service       # unit shipped in the RPM
-│   ├── flm-voice.spec          # rpmbuild spec
+│   ├── wayscribe.service       # unit shipped in the RPM
+│   ├── wayscribe.spec          # rpmbuild spec
 │   └── config.example.toml     # reference config shipped as %doc
 ├── scripts/
 │   ├── install-kde-hotkey.sh   # register a KDE Custom Shortcut helper
 │   ├── bench_transcribe.py     # latency smoke test against FLM serve
-│   ├── build-binary.sh         # PyInstaller --onefile -> dist/flm-voice
+│   ├── build-binary.sh         # PyInstaller --onefile -> dist/wayscribe
 │   └── build-rpm.sh            # binary -> ~/rpmbuild/RPMS/x86_64/*.rpm
 └── tests/
     ├── test_keyboard.py
@@ -47,7 +47,7 @@ whisper.npu/
 
 - **No local model.** The repo only HTTP-POSTs WAV bytes to the FLM container;
   all NPU/Whisper work lives there (sibling repo `../fastflowlm-docker/`).
-- **Two processes over one Unix socket** at `$XDG_RUNTIME_DIR/flm-voice.sock`: a
+- **Two processes over one Unix socket** at `$XDG_RUNTIME_DIR/wayscribe.sock`: a
   stateless thin client (`ipc.py`) and the asyncio daemon (`daemon.py`) owning
   the `Recorder` and a `IDLE → RECORDING → TRANSCRIBING → IDLE` state machine. A
   single `asyncio.Lock` serializes every command.
@@ -71,7 +71,7 @@ python3 -m venv .venv
 Smoke-test against a running FLM backend:
 
 ```bash
-.venv/bin/flm-voice oneshot --duration 3   # speak, see transcript
+.venv/bin/wayscribe oneshot --duration 3   # speak, see transcript
 scripts/bench_transcribe.py                # latency numbers vs FLM serve
 ```
 
@@ -82,11 +82,11 @@ python3 -m venv .venv
 .venv/bin/pip install -e .
 
 mkdir -p ~/.config/systemd/user
-cp flm_voice/service/flm-voice.service ~/.config/systemd/user/
+cp wayscribe/service/wayscribe.service ~/.config/systemd/user/
 # point ExecStart at the venv binary:
-sed -i "s|%h/.local/bin/flm-voice|$PWD/.venv/bin/flm-voice|" ~/.config/systemd/user/flm-voice.service
+sed -i "s|%h/.local/bin/wayscribe|$PWD/.venv/bin/wayscribe|" ~/.config/systemd/user/wayscribe.service
 systemctl --user daemon-reload
-systemctl --user enable --now flm-voice
+systemctl --user enable --now wayscribe
 
 scripts/install-kde-hotkey.sh          # prints the hotkey-binding steps
 ```
@@ -99,10 +99,10 @@ A single self-contained executable — no Python or venv on the target, only
 `libportaudio.so.2` plus whichever output tools you use:
 
 ```bash
-scripts/build-binary.sh                # PyInstaller --onefile -> dist/flm-voice (~30 MB)
+scripts/build-binary.sh                # PyInstaller --onefile -> dist/wayscribe (~30 MB)
 ```
 
-Drop `dist/flm-voice` into `~/.local/bin/`, point the unit's `ExecStart=` at it,
+Drop `dist/wayscribe` into `~/.local/bin/`, point the unit's `ExecStart=` at it,
 and the Python source tree is no longer needed at runtime.
 
 ## RPM package (openSUSE)
@@ -110,16 +110,16 @@ and the Python source tree is no longer needed at runtime.
 ```bash
 sudo zypper install rpm-build          # one-time
 scripts/build-rpm.sh                   # builds the binary, then the RPM
-# -> ~/rpmbuild/RPMS/x86_64/flm-voice-*.rpm
+# -> ~/rpmbuild/RPMS/x86_64/wayscribe-*.rpm
 ```
 
-The spec (`packaging/flm-voice.spec`) installs:
+The spec (`packaging/wayscribe.spec`) installs:
 
-- `/usr/bin/flm-voice` — the PyInstaller binary
-- `/usr/lib/systemd/user/flm-voice.service` — systemd user unit
-- `/usr/share/doc/packages/flm-voice/README.md`
-- `/usr/share/doc/packages/flm-voice/config.example.toml`
-- `/usr/share/licenses/flm-voice/LICENSE`
+- `/usr/bin/wayscribe` — the PyInstaller binary
+- `/usr/lib/systemd/user/wayscribe.service` — systemd user unit
+- `/usr/share/doc/packages/wayscribe/README.md`
+- `/usr/share/doc/packages/wayscribe/config.example.toml`
+- `/usr/share/licenses/wayscribe/LICENSE`
 
 Hard dep `libportaudio2`; `Recommends:` `wl-clipboard`, `libnotify-tools`.
 

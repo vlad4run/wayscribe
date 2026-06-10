@@ -2,15 +2,15 @@
 # no extractable debug symbols.
 %global debug_package %{nil}
 
-Name:           flm-voice
+Name:           wayscribe
 Version:        0.1.0
 Release:        1%{?dist}
 Summary:        Hotkey voice-to-text for KDE Plasma Wayland (Whisper on AMD NPU)
 License:        MIT
 
 # Sources are staged by scripts/build-rpm.sh into %%{_topdir}/SOURCES.
-Source0:        flm-voice
-Source1:        flm-voice.service
+Source0:        wayscribe
+Source1:        wayscribe.service
 Source2:        LICENSE
 Source3:        README.md
 Source4:        config.example.toml
@@ -27,7 +27,7 @@ Recommends:     wl-clipboard
 Recommends:     libnotify-tools
 
 %description
-flm-voice is a headless voice-to-text daemon for KDE Plasma Wayland. A
+wayscribe is a headless voice-to-text daemon for KDE Plasma Wayland. A
 global hotkey starts and stops recording; audio is transcribed by Whisper
 V3 Turbo running on the AMD Ryzen AI NPU (via FastFlowLM) and the result
 lands in the clipboard, with a KDE notification preview.
@@ -48,8 +48,8 @@ cp -p %{SOURCE6} deploy-npu/compose.yaml
 cp -p %{SOURCE7} deploy-npu/.env.example
 
 %install
-install -D -m 0755 %{SOURCE0} %{buildroot}%{_bindir}/flm-voice
-install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/flm-voice.service
+install -D -m 0755 %{SOURCE0} %{buildroot}%{_bindir}/wayscribe
+install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/wayscribe.service
 
 %files
 %license LICENSE
@@ -58,8 +58,8 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/flm-voice.service
 %doc config.example.toml
 # NPU backend compose (FastFlowLM / Whisper-on-NPU)
 %doc deploy-npu
-%{_bindir}/flm-voice
-%{_userunitdir}/flm-voice.service
+%{_bindir}/wayscribe
+%{_userunitdir}/wayscribe.service
 
 %changelog
 * Mon Jun 09 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.1.0-1

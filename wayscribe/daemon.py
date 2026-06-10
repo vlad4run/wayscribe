@@ -14,12 +14,12 @@ from typing import Any
 
 import httpx
 
-from flm_voice import keyboard, output, vad
-from flm_voice.config import Config, socket_path
-from flm_voice.recorder import Recorder, silent_wav
-from flm_voice.transcriber import transcribe_async
+from wayscribe import keyboard, output, vad
+from wayscribe.config import Config, socket_path
+from wayscribe.recorder import Recorder, silent_wav
+from wayscribe.transcriber import transcribe_async
 
-log = logging.getLogger("flm-voice")
+log = logging.getLogger("wayscribe")
 
 
 class State(str, Enum):
@@ -73,7 +73,7 @@ class Daemon:
         else:
             self.cfg.language = value
         display = self.cfg.language or "auto"
-        output.notify("flm-voice", f"language: {display}")
+        output.notify("wayscribe", f"language: {display}")
         log.info("language set to %s", display)
         return display
 
@@ -112,7 +112,7 @@ class Daemon:
                     self._cancel_watchdogs()
                     await asyncio.to_thread(self.recorder.stop)
                     self.state = State.IDLE
-                    output.notify("flm-voice", "cancelled")
+                    output.notify("wayscribe", "cancelled")
                 return self._status_snapshot()
 
             if cmd == "toggle":
@@ -120,7 +120,7 @@ class Daemon:
                     return await self._start_recording_locked()
                 if self.state == State.RECORDING:
                     return await self._stop_and_dispatch_locked(reason="toggle")
-                output.notify("flm-voice", "still transcribing previous recording…")
+                output.notify("wayscribe", "still transcribing previous recording…")
                 return self._status_snapshot({"ok": False, "reason": "busy"})
 
             if cmd == "lang_set":
@@ -138,11 +138,11 @@ class Daemon:
             await asyncio.to_thread(self.recorder.start)
         except Exception as exc:
             log.exception("recorder failed to start")
-            output.notify("flm-voice", f"mic error: {exc}", icon="dialog-error")
+            output.notify("wayscribe", f"mic error: {exc}", icon="dialog-error")
             return {"ok": False, "error": str(exc)}
         self.state = State.RECORDING
         await self._sync_language_from_layout()
-        output.notify("flm-voice", "recording…", icon="audio-input-microphone")
+        output.notify("wayscribe", "recording…", icon="audio-input-microphone")
         self._max_duration_task = asyncio.create_task(self._max_duration_watchdog())
         if self.cfg.auto_stop:
             self._vad_task = asyncio.create_task(self._vad_watchdog())
@@ -173,7 +173,7 @@ class Daemon:
             if self.state != State.RECORDING:
                 return
             log.info("max duration %.1fs reached, auto-stopping", self.cfg.max_duration_sec)
-            output.notify("flm-voice", f"max duration reached ({int(self.cfg.max_duration_sec)}s)")
+            output.notify("wayscribe", f"max duration reached ({int(self.cfg.max_duration_sec)}s)")
             await self._stop_and_dispatch_locked(reason="max-duration")
 
     async def _vad_watchdog(self) -> None:
@@ -219,18 +219,18 @@ class Daemon:
         except httpx.ConnectError as exc:
             log.warning("FLM unreachable at %s: %s", self.cfg.endpoint, exc)
             output.notify(
-                "flm-voice", f"FLM unreachable ({self.cfg.endpoint})", icon="dialog-error"
+                "wayscribe", f"FLM unreachable ({self.cfg.endpoint})", icon="dialog-error"
             )
             self.state = State.IDLE
             return
         except Exception as exc:
             log.exception("transcription failed")
-            output.notify("flm-voice", f"transcription failed: {exc}", icon="dialog-error")
+            output.notify("wayscribe", f"transcription failed: {exc}", icon="dialog-error")
             self.state = State.IDLE
             return
         text = (text or "").strip()
         if not text:
-            output.notify("flm-voice", "(empty transcription)")
+            output.notify("wayscribe", "(empty transcription)")
             self.state = State.IDLE
             return
         for backend in self._effective_outputs():
@@ -241,7 +241,7 @@ class Daemon:
                     output.type_text(text)
                 elif backend == "notify":
                     preview = text if len(text) < 200 else text[:197] + "…"
-                    output.notify("flm-voice", preview)
+                    output.notify("wayscribe", preview)
             except Exception:
                 log.exception("output backend %r failed", backend)
         log.info("transcribed %d chars", len(text))

@@ -12,7 +12,7 @@ import asyncio
 import logging
 import re
 
-log = logging.getLogger("flm-voice")
+log = logging.getLogger("wayscribe")
 
 _DEST = "org.kde.KWin"
 _PATH = "/Layouts"

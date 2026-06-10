@@ -1,8 +1,8 @@
 """Effective output backends (auto_type sugar) — no real I/O."""
 from __future__ import annotations
 
-from flm_voice.config import Config
-from flm_voice.daemon import Daemon
+from wayscribe.config import Config
+from wayscribe.daemon import Daemon
 
 
 def test_auto_type_off_keeps_outputs() -> None:

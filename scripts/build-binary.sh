@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Pack flm-voice into a single self-contained Linux binary via PyInstaller.
+# Pack wayscribe into a single self-contained Linux binary via PyInstaller.
 #
-# Output: dist/flm-voice (~25-40 MB; bundles Python, numpy, sounddevice,
+# Output: dist/wayscribe (~25-40 MB; bundles Python, numpy, sounddevice,
 # httpx). Runtime requirements on the target machine:
 #   - PortAudio (libportaudio.so.2) — provided by libasound2/pipewire on
 #     openSUSE; install separately on minimal targets.
@@ -30,20 +30,20 @@ if ! "$PY" -m PyInstaller --version >/dev/null 2>&1; then
 fi
 
 echo ">>> Cleaning previous build artifacts"
-rm -rf build/ dist/ flm-voice.spec
+rm -rf build/ dist/ wayscribe.spec
 
 echo ">>> Building single-file binary"
 "$PY" -m PyInstaller \
     --onefile \
-    --name flm-voice \
+    --name wayscribe \
     --noupx \
     --clean \
     --log-level WARN \
-    --collect-submodules flm_voice \
-    flm_voice/__main__.py
+    --collect-submodules wayscribe \
+    wayscribe/__main__.py
 
-SIZE="$(du -h dist/flm-voice | awk '{print $1}')"
+SIZE="$(du -h dist/wayscribe | awk '{print $1}')"
 echo
-echo ">>> Built dist/flm-voice (${SIZE})"
+echo ">>> Built dist/wayscribe (${SIZE})"
 echo "Smoke test:"
-dist/flm-voice --help | sed 's/^/    /'
+dist/wayscribe --help | sed 's/^/    /'

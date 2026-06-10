@@ -1,11 +1,11 @@
-# flm-voice configuration — example / reference.
+# wayscribe configuration — example / reference.
 #
-# Copy to ~/.config/flm-voice/config.toml and uncomment what you want to
+# Copy to ~/.config/wayscribe/config.toml and uncomment what you want to
 # change. Every key is optional; the values shown are the built-in defaults,
 # so an empty file (or no file at all) behaves exactly like this one.
 #
-#   cp /usr/share/doc/packages/flm-voice/config.example.toml \
-#      ~/.config/flm-voice/config.toml
+#   cp /usr/share/doc/packages/wayscribe/config.example.toml \
+#      ~/.config/wayscribe/config.toml
 
 # --- FLM backend -------------------------------------------------------------
 # endpoint = "http://localhost:52625"   # or a LAN host: "http://192.168.1.50:52625"
@@ -13,10 +13,10 @@
 # request_timeout_sec = 60.0            # HTTP timeout per transcription POST
 
 # --- Language ----------------------------------------------------------------
-# language = "ru"                       # ISO-639-1; `flm-voice lang auto` for auto-detect
+# language = "ru"                       # ISO-639-1; `wayscribe lang auto` for auto-detect
 # language_from_layout = true           # follow the active KDE keyboard layout per recording
                                         # (overrides `language`; needs gdbus + a KDE session)
-# languages = ["ru", "en"]              # cycled by `flm-voice lang next`
+# languages = ["ru", "en"]              # cycled by `wayscribe lang next`
 
 # --- Audio -------------------------------------------------------------------
 # sample_rate = 16000

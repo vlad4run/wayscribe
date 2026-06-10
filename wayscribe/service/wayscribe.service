@@ -1,0 +1,16 @@
+[Unit]
+Description=wayscribe daemon (hotkey voice-to-text for KDE Plasma Wayland)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# Adjust ExecStart to your install location:
+#   pipx install -e .   -> %h/.local/bin/wayscribe
+#   pip install -e .    inside a venv -> /full/path/to/.venv/bin/wayscribe
+ExecStart=%h/.local/bin/wayscribe daemon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
