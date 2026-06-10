@@ -67,7 +67,7 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/wayscribe.service
 - status reports backend reachability; warmup notifies on a down backend
 - Probe backend outside the daemon state lock
 
-* Mon Jun 09 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.1.0-1
+* Tue Jun 09 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.1.0-1
 - Default language ru; follow KDE keyboard layout by default
 - Ship config.example.toml reference
 
