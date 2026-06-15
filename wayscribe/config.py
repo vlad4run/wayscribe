@@ -36,6 +36,9 @@ class Config:
     input_device: str | None = None
     outputs: list[str] = field(default_factory=lambda: ["clipboard", "notify"])
     auto_type: bool = False  # also type the transcript into the focused window
+    # one in-place-updated notification (recording bar + status) instead of
+    # discrete popups; degrades to discrete popups where unsupported
+    live_notification: bool = True
     # Phase-6 polish
     max_duration_sec: float = 300.0
     warmup: bool = True

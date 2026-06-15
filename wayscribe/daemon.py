@@ -21,6 +21,15 @@ from wayscribe.transcriber import probe_async, transcribe_async
 
 log = logging.getLogger("wayscribe")
 
+# RMS that maps to a full (100%) mic-level bar during recording. int16 speech
+# peaks well below this; tuned so normal talking lands mid-bar.
+_LEVEL_FULL_SCALE = 3000.0
+
+
+def _fmt_mmss(seconds: float) -> str:
+    total = int(seconds)
+    return f"{total // 60}:{total % 60:02d}"
+
 
 class State(str, Enum):
     IDLE = "idle"
@@ -38,6 +47,12 @@ class Daemon:
         self._inflight: asyncio.Task[None] | None = None
         self._max_duration_task: asyncio.Task[None] | None = None
         self._vad_task: asyncio.Task[None] | None = None
+        # Live-feedback notification: one popup updated in place across the
+        # record→transcribe→done cycle. `_notify_id` is the current popup id;
+        # `_notify_supported` flips False if id capture fails (degrade to plain).
+        self._notify_id: int | None = None
+        self._notify_supported: bool = True
+        self._notify_task: asyncio.Task[None] | None = None
 
     def _ensure_async_primitives(self) -> None:
         if self._lock is None:
@@ -122,7 +137,7 @@ class Daemon:
                     self._cancel_watchdogs()
                     await asyncio.to_thread(self.recorder.stop)
                     self.state = State.IDLE
-                    output.notify("wayscribe", "cancelled")
+                    await self._live_notify("wayscribe", "cancelled", icon="dialog-information")
                 return self._status_snapshot()
 
             if cmd == "toggle":
@@ -148,31 +163,116 @@ class Daemon:
             await asyncio.to_thread(self.recorder.start)
         except Exception as exc:
             log.exception("recorder failed to start")
-            output.notify("wayscribe", f"mic error: {exc}", icon="dialog-error")
+            await self._live_notify(
+                "wayscribe", f"mic error: {exc}", icon="dialog-error", new_cycle=True
+            )
             return {"ok": False, "error": str(exc)}
         self.state = State.RECORDING
         await self._sync_language_from_layout()
-        output.notify("wayscribe", "recording…", icon="audio-input-microphone")
+        await self._live_notify(
+            "wayscribe",
+            "Recording… 0:00",
+            icon="media-record",
+            progress=0,
+            timeout_ms=0,
+            new_cycle=True,
+        )
         self._max_duration_task = asyncio.create_task(self._max_duration_watchdog())
         if self.cfg.auto_stop:
             self._vad_task = asyncio.create_task(self._vad_watchdog())
+        if self.cfg.live_notification and self._notify_supported:
+            self._notify_task = asyncio.create_task(self._notify_updater())
         return self._status_snapshot()
 
     async def _stop_and_dispatch_locked(self, reason: str) -> dict[str, Any]:
         self._cancel_watchdogs()
         wav = await asyncio.to_thread(self.recorder.stop)
         self.state = State.TRANSCRIBING
+        await self._live_notify("wayscribe", "Transcribing…", icon="view-refresh", timeout_ms=0)
         log.info("captured %d bytes (reason=%s)", len(wav), reason)
         self._inflight = asyncio.create_task(self._transcribe_and_output(wav))
         return self._status_snapshot({"bytes": len(wav), "reason": reason})
 
     def _cancel_watchdogs(self) -> None:
         current = asyncio.current_task()
-        for attr in ("_max_duration_task", "_vad_task"):
+        for attr in ("_max_duration_task", "_vad_task", "_notify_task"):
             task = getattr(self, attr)
             if task is not None and task is not current and not task.done():
                 task.cancel()
             setattr(self, attr, None)
+
+    async def _live_notify(
+        self,
+        title: str,
+        body: str = "",
+        *,
+        icon: str = "audio-input-microphone",
+        progress: int | None = None,
+        timeout_ms: int | None = None,
+        new_cycle: bool = False,
+    ) -> None:
+        """Emit/update the single live-feedback notification.
+
+        Captures an id on the first frame of a cycle, then replaces it in place.
+        notify-send runs in a thread (offload invariant). Falls back to a plain
+        popup when disabled or when id capture is unsupported.
+        """
+        if not self.cfg.live_notification:
+            await asyncio.to_thread(output.notify, title, body, icon)
+            return
+        if new_cycle:
+            self._notify_id = None
+            self._notify_supported = True
+        if self._notify_supported and self._notify_id is None:
+            nid = await asyncio.to_thread(
+                output.notify_update,
+                title,
+                body,
+                icon=icon,
+                progress=progress,
+                timeout_ms=timeout_ms,
+                want_id=True,
+            )
+            if nid is None:
+                self._notify_supported = False
+            else:
+                self._notify_id = nid
+        elif self._notify_supported and self._notify_id is not None:
+            await asyncio.to_thread(
+                output.notify_update,
+                title,
+                body,
+                icon=icon,
+                replace_id=self._notify_id,
+                progress=progress,
+                timeout_ms=timeout_ms,
+            )
+        else:
+            await asyncio.to_thread(output.notify, title, body, icon)
+
+    async def _notify_updater(self) -> None:
+        """While RECORDING, refresh the popup with elapsed time + mic-level bar.
+
+        Reads state and the (thread-safe) recorder without the lock; a stale
+        frame after a transition is benign and immediately overwritten.
+        """
+        try:
+            while True:
+                await asyncio.sleep(0.5)
+                if self.state != State.RECORDING:
+                    return
+                elapsed = self.recorder.current_duration()
+                level = vad.rms(self.recorder.peek_recent(0.3))
+                pct = min(100, int(level / _LEVEL_FULL_SCALE * 100))
+                await self._live_notify(
+                    "wayscribe",
+                    f"Recording… {_fmt_mmss(elapsed)}",
+                    icon="media-record",
+                    progress=pct,
+                    timeout_ms=0,
+                )
+        except asyncio.CancelledError:
+            return
 
     async def _max_duration_watchdog(self) -> None:
         try:
@@ -228,32 +328,44 @@ class Daemon:
             text = await transcribe_async(wav, self.cfg)
         except httpx.ConnectError as exc:
             log.warning("FLM unreachable at %s: %s", self.cfg.endpoint, exc)
-            output.notify(
+            await self._live_notify(
                 "wayscribe", f"FLM unreachable ({self.cfg.endpoint})", icon="dialog-error"
             )
             self.state = State.IDLE
             return
         except Exception as exc:
             log.exception("transcription failed")
-            output.notify("wayscribe", f"transcription failed: {exc}", icon="dialog-error")
+            await self._live_notify(
+                "wayscribe", f"transcription failed: {exc}", icon="dialog-error"
+            )
             self.state = State.IDLE
             return
         text = (text or "").strip()
         if not text:
-            output.notify("wayscribe", "(empty transcription)")
+            await self._live_notify("wayscribe", "(empty transcription)")
             self.state = State.IDLE
             return
-        for backend in self._effective_outputs():
+        outputs = self._effective_outputs()
+        for backend in outputs:
+            if backend == "notify":
+                continue  # delivered by the terminal frame below
             try:
                 if backend == "clipboard":
                     output.to_clipboard(text)
                 elif backend == "type":
                     output.type_text(text)
-                elif backend == "notify":
-                    preview = text if len(text) < 200 else text[:197] + "…"
-                    output.notify("wayscribe", preview)
             except Exception:
                 log.exception("output backend %r failed", backend)
+        # Terminal frame: always fires when live_notification is on, so the
+        # persistent "Transcribing…" frame is cleared even without a notify
+        # backend. The transcript preview doubles as the notify output.
+        preview = text if len(text) < 200 else text[:197] + "…"
+        notify_requested = "notify" in outputs
+        if self.cfg.live_notification:
+            body = preview if notify_requested else f"done ({len(text)} chars)"
+            await self._live_notify("wayscribe", body, icon="dialog-information")
+        elif notify_requested:
+            await self._live_notify("wayscribe", preview, icon="dialog-information")
         log.info("transcribed %d chars", len(text))
         self.state = State.IDLE
 

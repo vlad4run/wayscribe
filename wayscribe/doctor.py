@@ -7,6 +7,7 @@ so it is usable in scripts.
 """
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass
 
@@ -75,15 +76,22 @@ def _tool_checks(cfg: Config) -> list[Check]:
             Check("wl-copy", present, "" if present else "install wl-clipboard")
         )
 
-    typer = shutil.which("wtype") or shutil.which("ydotool")
-    checks.append(
-        Check(
-            "wtype/ydotool",
-            typer is not None or not wants_type,
-            (typer or "install wtype") if wants_type else "not needed",
-            required=wants_type,
-        )
-    )
+    # ydotool is the working path on KWin/Plasma; wtype needs the
+    # virtual-keyboard protocol that KWin does not implement (wlroots only).
+    ydotool = shutil.which("ydotool")
+    wtype = shutil.which("wtype")
+    is_kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "")
+    if not wants_type:
+        type_ok, detail = True, "not needed"
+    elif ydotool:
+        type_ok, detail = True, ydotool
+    elif wtype and not is_kde:
+        type_ok, detail = True, wtype  # wlroots compositor: wtype works
+    elif wtype:
+        type_ok, detail = False, "wtype unsupported on KWin — install ydotool"
+    else:
+        type_ok, detail = False, "install ydotool (KWin) or wtype (wlroots)"
+    checks.append(Check("wtype/ydotool", type_ok, detail, required=wants_type))
 
     # notify is best-effort (silent no-op if missing), so never a hard failure.
     notify = shutil.which("notify-send") is not None

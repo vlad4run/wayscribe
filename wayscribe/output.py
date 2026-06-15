@@ -18,19 +18,90 @@ def to_clipboard(text: str) -> None:
 
 
 def type_text(text: str) -> None:
-    if shutil.which("wtype"):
-        subprocess.run(["wtype", "--", text], check=True)
-    elif shutil.which("ydotool"):
-        subprocess.run(["ydotool", "type", "--", text], check=True)
-    else:
-        raise RuntimeError("neither wtype nor ydotool found in PATH")
+    have_wtype = shutil.which("wtype") is not None
+    have_ydotool = shutil.which("ydotool") is not None
+    if not have_wtype and not have_ydotool:
+        raise RuntimeError(
+            "no keystroke tool found — install ydotool (KWin/Plasma) or wtype (wlroots)"
+        )
+    if have_wtype:
+        try:
+            subprocess.run(["wtype", "--", text], check=True)
+            return
+        except subprocess.CalledProcessError:
+            # wtype needs zwp_virtual_keyboard_manager_v1, which KWin (Plasma)
+            # does not implement, so wtype fails there. Fall back to ydotool.
+            if not have_ydotool:
+                raise RuntimeError(
+                    "wtype failed — on KWin/Plasma install ydotool "
+                    "(wtype works only on wlroots compositors)"
+                ) from None
+    # Reached only when ydotool is available (wtype absent or just failed).
+    subprocess.run(["ydotool", "type", "--", text], check=True)
+
+
+def _send_notification(
+    title: str,
+    body: str = "",
+    *,
+    icon: str = "audio-input-microphone",
+    replace_id: int | None = None,
+    progress: int | None = None,
+    timeout_ms: int | None = None,
+    capture_id: bool = False,
+) -> int | None:
+    """Fire a `notify-send`. Returns the notification id when `capture_id`.
+
+    `replace_id` updates a notification in place; `progress` (0-100) renders a
+    progress bar on KDE via the `value` hint; `timeout_ms=0` means persistent.
+    Best-effort: a missing `notify-send` is a silent no-op (returns None).
+    """
+    argv = ["notify-send", "--app-name=wayscribe", "--icon", icon]
+    if replace_id is not None:
+        argv += ["--replace-id", str(replace_id)]
+    if progress is not None:
+        argv += ["--hint", f"int:value:{progress}"]
+    if timeout_ms is not None:
+        argv += ["--expire-time", str(timeout_ms)]
+    if capture_id:
+        argv.append("--print-id")
+    argv += [title, body]
+    try:
+        if capture_id:
+            proc = subprocess.run(argv, capture_output=True, text=True, check=False)
+            if proc.returncode != 0:
+                return None
+            try:
+                return int(proc.stdout.strip())
+            except ValueError:
+                return None
+        subprocess.run(argv, check=False)
+    except FileNotFoundError:
+        pass
+    return None
 
 
 def notify(title: str, body: str = "", icon: str = "audio-input-microphone") -> None:
-    try:
-        subprocess.run(
-            ["notify-send", "--app-name=wayscribe", "--icon", icon, title, body],
-            check=False,
-        )
-    except FileNotFoundError:
-        pass
+    _send_notification(title, body, icon=icon)
+
+
+def notify_update(
+    title: str,
+    body: str = "",
+    *,
+    icon: str = "audio-input-microphone",
+    replace_id: int | None = None,
+    progress: int | None = None,
+    timeout_ms: int | None = None,
+    want_id: bool = False,
+) -> int | None:
+    """Live-feedback notification: capture/replace an id, set a progress bar."""
+    return _send_notification(
+        title,
+        body,
+        icon=icon,
+        replace_id=replace_id,
+        progress=progress,
+        timeout_ms=timeout_ms,
+        capture_id=want_id,
+    )

@@ -33,7 +33,7 @@ flowchart TD
 2. First toggle starts recording the mic; second toggle stops and POSTs the WAV
    to the **[transcription backend](BACKEND.md)** (Whisper on the NPU by default).
 3. The transcript fans out to your configured outputs: clipboard (`wl-copy`),
-   keystroke injection (`wtype`/`ydotool`), and a KDE notification.
+   keystroke injection (`ydotool`; `wtype` on wlroots), and a KDE notification.
 
 The daemon holds a small state machine (`IDLE → RECORDING → TRANSCRIBING →
 IDLE`). Safety rails: a max-duration watchdog auto-stops a forgotten recording,
@@ -52,7 +52,8 @@ talking.
 | `libportaudio2` | microphone capture | **yes** |
 | `wl-clipboard` | copy transcript (`wl-copy`) | recommended |
 | `libnotify-tools` | KDE notification (`notify-send`) | recommended |
-| `wtype` *or* `ydotool` | type into focused window (`auto_type`) | optional |
+| `ydotool` | type into focused window (`auto_type`) on KWin/Plasma | optional |
+| `wtype` | type into focused window — **wlroots only** (Sway/Hyprland), **not KWin** | optional |
 
 ## Installation
 
@@ -60,8 +61,9 @@ talking.
 
 ```bash
 sudo zypper install libportaudio2 wl-clipboard libnotify-tools
-# optional, for keystroke auto-insert:
-sudo zypper install wtype
+# optional, for keystroke auto-insert into the focused window (KWin/Plasma):
+sudo zypper install ydotool
+# (wtype is an alternative, but works only on wlroots compositors — not KWin)
 ```
 
 `notify-send` is normally already present on KDE.
@@ -155,8 +157,9 @@ language_from_layout = true           # follow the active KDE keyboard layout pe
 languages = ["ru", "en"]              # cycled by `wayscribe lang next`
 sample_rate = 16000
 # input_device = "alsa_input.pci-0000_..."
-outputs = ["clipboard", "notify"]     # also: "type" (wtype/ydotool)
+outputs = ["clipboard", "notify"]     # also: "type" (ydotool; wtype on wlroots)
 auto_type = false                     # also type the transcript into the focused window
+live_notification = true              # one in-place-updated popup (recording bar + status)
 
 warmup = true                         # POST a 1s silent WAV at daemon startup
 max_duration_sec = 300                # hard cap; auto-stops + transcribes
@@ -170,9 +173,25 @@ vad_rms_threshold = 500.0             # higher = needs louder speech
 host, whisper.cpp/faster-whisper, or OpenAI itself. See [BACKEND.md](BACKEND.md).
 
 **Auto-type into the focused window** — set `auto_type = true` (or add `"type"`
-to `outputs`). Synthesizes keystrokes via `wtype` (Wayland) or `ydotool`, typing
-the transcript wherever focus is when transcription finishes. Needs
-`wtype`/`ydotool` installed. Keep `clipboard` in `outputs` as a fallback.
+to `outputs`). Types the transcript wherever focus is when transcription
+finishes. **On KWin/Plasma use `ydotool`** — `wtype` needs the
+`zwp_virtual_keyboard_manager_v1` protocol, which KWin does not implement, so it
+only works on wlroots compositors (Sway/Hyprland). wayscribe tries `wtype` first
+and falls back to `ydotool` if it fails, so installing only `ydotool` is fine.
+
+`ydotool`'s trade-offs (vs the default clipboard): it needs the **`ydotoold`
+daemon** running and access to **`/dev/uinput`** (run `ydotoold` as root, or add
+a udev rule + group so your user can open it). It injects at the kernel level,
+so it is **keyboard-layout dependent** — non-US layouts or unusual Unicode can
+mistype — and types wherever focus lands at finish time. Keep `clipboard` in
+`outputs` as the reliable fallback.
+
+**Live notification** — `live_notification = true` (default) shows a single
+desktop notification that updates in place: a recording timer with a mic-level
+bar, then "Transcribing…", then the transcript. It needs `notify-send` with
+`--print-id`/`--replace-id` (libnotify ≥ 0.7; KDE renders the bar from the
+`value` hint). Where unsupported it degrades to discrete popups; set it to
+`false` to force the old discrete-popup behavior.
 
 **Language follows keyboard layout** — with `language_from_layout = true` (the
 default), at each recording start the daemon reads the active KDE layout and
@@ -193,7 +212,7 @@ wayscribe doctor
   backend         ✗  unreachable http://localhost:52625 — [Errno 111] Connection refused
   model whisper…  ✗  backend down
   wl-copy         ✓
-  wtype/ydotool   ✓  /usr/bin/wtype
+  wtype/ydotool   ✓  /usr/bin/ydotool
   notify-send     ✓
   config          ✓  using defaults (no config.toml)
 ```
@@ -211,6 +230,8 @@ journalctl --user -u wayscribe -n 50   # last 50 lines
 | `wayscribe daemon not running` | Daemon not started | `systemctl --user start wayscribe` |
 | Transcription empty | Mic muted / wrong source | `pactl list sources short`, pick one, set `input_device` in the config |
 | Clipboard not updated | `wl-clipboard` missing | `sudo zypper install wl-clipboard` |
+| Auto-type does nothing on KDE | `wtype` can't work on KWin (no virtual-keyboard protocol) | `sudo zypper install ydotool` + run `ydotoold`; ensure `/dev/uinput` access |
+| Notification doesn't update in place | `notify-send` too old (no `--replace-id`) | update `libnotify-tools`, or set `live_notification = false` |
 | `backend unreachable` notification at login | Backend down at startup | `wayscribe doctor`, then [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
 | `FLM unreachable` / backend errors | Backend down or misconfigured | `wayscribe doctor`; see [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
 

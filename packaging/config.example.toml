@@ -23,11 +23,16 @@
 # input_device = "alsa_input.pci-0000_..."   # omit to use the default source
 
 # --- Output ------------------------------------------------------------------
-# outputs = ["clipboard", "notify"]     # also: "type" (wtype/ydotool)
+# outputs = ["clipboard", "notify"]     # also: "type" (ydotool; wtype on wlroots)
 # auto_type = false                     # also type the transcript into the focused
-                                        # window via wtype/ydotool (sugar for adding
-                                        # "type" to outputs). Types wherever focus is
-                                        # when transcription finishes.
+                                        # window (sugar for adding "type" to outputs).
+                                        # On KWin/Plasma use ydotool — wtype only works
+                                        # on wlroots compositors. Types wherever focus
+                                        # is when transcription finishes.
+# live_notification = true              # one in-place-updated popup: recording timer +
+                                        # mic-level bar, then status, then transcript.
+                                        # Needs notify-send --replace-id (libnotify>=0.7);
+                                        # set false for discrete popups.
 
 # --- Safety rails ------------------------------------------------------------
 # warmup = true                         # POST a 1s silent WAV at daemon startup
