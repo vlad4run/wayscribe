@@ -6,6 +6,7 @@ so the daemon can log them. `notify` is best-effort and silently no-ops if
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 
@@ -24,19 +25,23 @@ def type_text(text: str) -> None:
         raise RuntimeError(
             "no keystroke tool found — install ydotool (KWin/Plasma) or wtype (wlroots)"
         )
-    if have_wtype:
+    # wtype needs zwp_virtual_keyboard_manager_v1, which KWin (Plasma) does not
+    # implement, so wtype always fails on KDE. When ydotool is present there,
+    # use it first and skip the guaranteed-failing wtype spawn.
+    is_kde = "KDE" in os.environ.get("XDG_CURRENT_DESKTOP", "")
+    prefer_ydotool = is_kde and have_ydotool
+    if have_wtype and not prefer_ydotool:
         try:
             subprocess.run(["wtype", "--", text], check=True)
             return
         except subprocess.CalledProcessError:
-            # wtype needs zwp_virtual_keyboard_manager_v1, which KWin (Plasma)
-            # does not implement, so wtype fails there. Fall back to ydotool.
+            # Fall back to ydotool (e.g. KWin with XDG_CURRENT_DESKTOP unset).
             if not have_ydotool:
                 raise RuntimeError(
                     "wtype failed — on KWin/Plasma install ydotool "
                     "(wtype works only on wlroots compositors)"
                 ) from None
-    # Reached only when ydotool is available (wtype absent or just failed).
+    # Reached when ydotool is the chosen path (preferred, or wtype absent/failed).
     subprocess.run(["ydotool", "type", "--", text], check=True)
 
 

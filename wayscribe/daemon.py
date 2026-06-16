@@ -273,6 +273,10 @@ class Daemon:
                 )
         except asyncio.CancelledError:
             return
+        except Exception:
+            # Never let a transient recorder/notify error kill the task
+            # silently ("exception never retrieved"); the next cycle recovers.
+            log.exception("notify updater failed")
 
     async def _max_duration_watchdog(self) -> None:
         try:

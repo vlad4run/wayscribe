@@ -71,10 +71,19 @@ class Recorder:
     def peek_recent(self, seconds: float) -> np.ndarray:
         target = int(seconds * self.sample_rate)
         with self._lock:
-            chunks = list(self._chunks)
-        if not chunks:
+            # Gather only the newest chunks summing to >= target, oldest-first,
+            # so a long recording does not re-concatenate its whole buffer on
+            # every call (this runs ~2x/sec from the VAD + notify watchdogs).
+            tail: list[np.ndarray] = []
+            have = 0
+            for chunk in reversed(self._chunks):
+                tail.append(chunk)
+                have += chunk.size
+                if have >= target:
+                    break
+        if not tail:
             return np.zeros(0, dtype=np.int16)
-        flat = np.concatenate([c.reshape(-1) for c in chunks])
+        flat = np.concatenate([c.reshape(-1) for c in reversed(tail)])
         if flat.size > target:
             flat = flat[-target:]
         return flat
