@@ -128,6 +128,7 @@ types itself into whatever window has focus — no paste needed.
 | `wayscribe lang` | Show the current transcription language. |
 | `wayscribe lang next` | Cycle to the next language in `languages`. |
 | `wayscribe lang ru` / `en` / `auto` | Set the language; `auto` lets Whisper detect it. |
+| `wayscribe log [-f] [-n N]` | Tail the daemon journal (systemd `--user` unit). |
 
 Quick smoke test once everything is up:
 
@@ -181,10 +182,12 @@ and falls back to `ydotool` if it fails, so installing only `ydotool` is fine.
 
 `ydotool`'s trade-offs (vs the default clipboard): it needs the **`ydotoold`
 daemon** running and access to **`/dev/uinput`** (run `ydotoold` as root, or add
-a udev rule + group so your user can open it). It injects at the kernel level,
-so it is **keyboard-layout dependent** — non-US layouts or unusual Unicode can
-mistype — and types wherever focus lands at finish time. Keep `clipboard` in
-`outputs` as the reliable fallback.
+a udev rule + group so your user can open it), and it types wherever focus lands
+at finish time. `ydotool type` only emits **ASCII** keycodes, so for non-ASCII
+transcripts (e.g. Cyrillic) wayscribe automatically falls back to a
+clipboard-paste — `wl-copy` + a synthesized **Ctrl+V** — which is charset- and
+layout-agnostic. That paste **overwrites the clipboard**; keep `clipboard` in
+`outputs` anyway as the reliable manual fallback.
 
 **Live notification** — `live_notification = true` (default) shows a single
 desktop notification that updates in place: a recording timer with a mic-level
@@ -218,12 +221,20 @@ wayscribe doctor
 ```
 
 Live logs (the daemon is a systemd **user** service, so logs land in the user
-journal, not the system one):
+journal, not the system one). `wayscribe log` is a thin wrapper over the
+`journalctl` invocation:
 
 ```bash
+wayscribe log                          # last 50 lines
+wayscribe log -f                       # follow
+wayscribe log -n 200                   # last 200 lines
+# equivalent raw form:
 journalctl --user -u wayscribe -f      # follow
 journalctl --user -u wayscribe -n 50   # last 50 lines
 ```
+
+(If you run `wayscribe daemon` by hand instead of via systemd, the log is on
+that terminal's stderr — there is nothing in the journal to tail.)
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
@@ -231,6 +242,7 @@ journalctl --user -u wayscribe -n 50   # last 50 lines
 | Transcription empty | Mic muted / wrong source | `pactl list sources short`, pick one, set `input_device` in the config |
 | Clipboard not updated | `wl-clipboard` missing | `sudo zypper install wl-clipboard` |
 | Auto-type does nothing on KDE | `wtype` can't work on KWin (no virtual-keyboard protocol) | `sudo zypper install ydotool` + run `ydotoold`; ensure `/dev/uinput` access |
+| Auto-type drops letters, types only `.`/`,` | `ydotool type` emits ASCII only; non-ASCII (Cyrillic) is skipped | Already handled — wayscribe pastes non-ASCII via clipboard + Ctrl+V; ensure `wl-clipboard` is installed |
 | Notification doesn't update in place | `notify-send` too old (no `--replace-id`) | update `libnotify-tools`, or set `live_notification = false` |
 | `backend unreachable` notification at login | Backend down at startup | `wayscribe doctor`, then [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |
 | `FLM unreachable` / backend errors | Backend down or misconfigured | `wayscribe doctor`; see [BACKEND.md → Troubleshooting](BACKEND.md#troubleshooting) |

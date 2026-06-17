@@ -87,6 +87,8 @@ def _which(present: set[str]):
 def test_type_text_falls_back_to_ydotool_when_wtype_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Force the wtype-first path: on KDE the daemon prefers ydotool and skips wtype.
+    monkeypatch.delenv("XDG_CURRENT_DESKTOP", raising=False)
     monkeypatch.setattr(output.shutil, "which", _which({"wtype", "ydotool"}))
     calls: list[str] = []
 

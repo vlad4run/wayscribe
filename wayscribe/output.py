@@ -42,7 +42,29 @@ def type_text(text: str) -> None:
                     "(wtype works only on wlroots compositors)"
                 ) from None
     # Reached when ydotool is the chosen path (preferred, or wtype absent/failed).
-    subprocess.run(["ydotool", "type", "--", text], check=True)
+    # ydotool `type` maps ASCII -> evdev keycodes only; non-ASCII characters have
+    # no mapping and are silently dropped (Cyrillic transcripts come out as just
+    # the surviving ASCII punctuation). For any non-ASCII text, paste via the
+    # clipboard instead, which is layout/charset agnostic.
+    if text.isascii():
+        subprocess.run(["ydotool", "type", "--", text], check=True)
+    else:
+        _ydotool_paste(text)
+
+
+# Ctrl+V via raw evdev keycodes: KEY_LEFTCTRL=29, KEY_V=47.
+_PASTE_KEYS = ["29:1", "47:1", "47:0", "29:0"]
+
+
+def _ydotool_paste(text: str) -> None:
+    """Put `text` on the clipboard and synthesize Ctrl+V via ydotool.
+
+    Used for non-ASCII transcripts that ydotool `type` cannot emit. Overwrites
+    the clipboard (unavoidable for a paste); the `type` backend is already a
+    keystroke-synthesis path, so this stays within that contract.
+    """
+    to_clipboard(text)
+    subprocess.run(["ydotool", "key", *_PASTE_KEYS], check=True)
 
 
 def _send_notification(

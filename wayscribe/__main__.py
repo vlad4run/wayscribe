@@ -1,7 +1,9 @@
-"""wayscribe CLI: daemon | toggle | status | stop | cancel | oneshot | lang."""
+"""wayscribe CLI: daemon | toggle | status | stop | cancel | doctor | oneshot | lang | log."""
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
 
 
@@ -25,7 +27,39 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="Language code (e.g. ru, en), 'auto', or 'next' to cycle through configured languages",
     )
+    logp = sub.add_parser("log", help="Show the daemon journal (systemd --user unit)")
+    logp.add_argument("-f", "--follow", action="store_true", help="Follow new log lines")
+    logp.add_argument(
+        "-n", "--lines", type=int, default=50, help="Show the last N lines (default 50)"
+    )
     return parser
+
+
+# systemd --user unit name the README / packaging install the daemon under.
+_UNIT = "wayscribe.service"
+
+
+def cmd_log(follow: bool, lines: int) -> int:
+    """Tail the daemon journal, or print a hint if journalctl/the unit is absent.
+
+    The daemon logs to stderr, which journald captures only when it runs as the
+    systemd --user service. A manually-launched `wayscribe daemon` prints to its
+    own terminal instead, so there is nothing to tail here.
+    """
+    if shutil.which("journalctl") is None:
+        print(
+            "journalctl not found. If you run `wayscribe daemon` manually, the log is "
+            "on that terminal's stderr.",
+            file=sys.stderr,
+        )
+        return 2
+    argv = ["journalctl", "--user", "-u", _UNIT, "-n", str(lines)]
+    if follow:
+        argv.append("-f")
+    try:
+        return subprocess.run(argv, check=False).returncode
+    except KeyboardInterrupt:  # Ctrl+C out of -f follow mode is not an error.
+        return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -50,6 +84,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.value == "next":
             return send_command("lang_next")
         return send_command("lang_set", value=args.value)
+
+    if args.cmd == "log":
+        return cmd_log(args.follow, args.lines)
 
     if args.cmd == "oneshot":
         from wayscribe.recorder import record_to_wav
