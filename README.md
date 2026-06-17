@@ -70,7 +70,17 @@ sudo zypper install ydotool
 
 ### 2. Install the package
 
+Download the latest RPM from the
+[releases page](https://github.com/vlad4run/wayscribe/releases/latest), then:
+
 ```bash
+sudo zypper install ./wayscribe-*.rpm
+```
+
+Or grab and install it in one go with `gh`:
+
+```bash
+gh release download --repo vlad4run/wayscribe --pattern '*.rpm'
 sudo zypper install ./wayscribe-*.rpm
 ```
 
