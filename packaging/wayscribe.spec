@@ -3,7 +3,7 @@
 %global debug_package %{nil}
 
 Name:           wayscribe
-Version:        0.2.0
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        Hotkey voice-to-text for KDE Plasma Wayland (Whisper on AMD NPU)
 License:        MIT
@@ -62,6 +62,11 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/wayscribe.service
 %{_userunitdir}/wayscribe.service
 
 %changelog
+* Wed Jun 17 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.3.0-1
+- Auto-type: paste non-ASCII (e.g. Cyrillic) transcripts via clipboard +
+  Ctrl+V, since `ydotool type` emits ASCII keycodes only
+- Add `wayscribe log [-f] [-n N]` to tail the daemon journal
+
 * Wed Jun 10 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.2.0-1
 - Add `wayscribe doctor` self-diagnosis command
 - status reports backend reachability; warmup notifies on a down backend
