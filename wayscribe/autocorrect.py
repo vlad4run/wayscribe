@@ -148,10 +148,20 @@ class AutocorrectEngine:
         try:
             devices = self._find_keyboards(evdev)
         except PermissionError:
-            self._fail("no /dev/input access")
+            self._fail("no /dev/input access (add user to 'input' group)")
             return
         if not devices:
-            self._fail("no keyboard found")
+            # list_devices() only returns readable nodes, so a permission
+            # problem looks identical to "no keyboard" here. Disambiguate by
+            # checking whether event nodes exist but are unreadable.
+            import glob
+            import os
+
+            nodes = glob.glob("/dev/input/event*")
+            if nodes and not any(os.access(n, os.R_OK) for n in nodes):
+                self._fail("no /dev/input access (add user to 'input' group)")
+            else:
+                self._fail("no keyboard found")
             return
 
         ui = None
