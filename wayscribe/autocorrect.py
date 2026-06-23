@@ -216,6 +216,7 @@ class AutocorrectEngine:
         if c.target:
             await keyboard.set_layout_by_lang(c.target)
         fixed = c.text.rstrip(" ")
+        log.info("autocorrect: %r -> %r (target=%s)", c.original, fixed, c.target)
         await asyncio.to_thread(
             output.notify, "wayscribe", f"{c.original} → {fixed}", "dialog-information"
         )
