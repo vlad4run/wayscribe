@@ -58,9 +58,12 @@ _KEY_LEFTSHIFT = 42
 _KEY_BACKSPACE = 14
 _KEY_LEFT = 105
 _KEY_V = 47
+_KEY_INSERT = 110
 
-# Ctrl+V (paste): press ctrl, tap v, release ctrl.
-_PASTE_KEYS = [f"{_KEY_LEFTCTRL}:1", f"{_KEY_V}:1", f"{_KEY_V}:0", f"{_KEY_LEFTCTRL}:0"]
+# Shift+Insert (paste): press shift, tap insert, release shift.
+# Universal paste chord — works in terminals (Konsole, whose Paste is Ctrl+Shift+V,
+# not Ctrl+V) *and* Qt/GTK text entries, unlike Ctrl+V which terminals ignore.
+_PASTE_KEYS = [f"{_KEY_LEFTSHIFT}:1", f"{_KEY_INSERT}:1", f"{_KEY_INSERT}:0", f"{_KEY_LEFTSHIFT}:0"]
 
 
 def _require_ydotool() -> None:
@@ -93,7 +96,7 @@ def select_words_left(count: int) -> None:
 
 
 def _ydotool_paste(text: str) -> None:
-    """Put `text` on the clipboard and synthesize Ctrl+V via ydotool.
+    """Put `text` on the clipboard and synthesize Shift+Insert via ydotool.
 
     Used for non-ASCII transcripts that ydotool `type` cannot emit. Overwrites
     the clipboard (unavoidable for a paste); the `type` backend is already a

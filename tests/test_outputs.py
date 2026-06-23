@@ -34,10 +34,10 @@ def test_type_text_ascii_uses_ydotool_type(monkeypatch: pytest.MonkeyPatch) -> N
 def test_type_text_non_ascii_pastes_via_clipboard(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = _force_ydotool(monkeypatch)
     output.type_text("привет, мир.")
-    # First wl-copy stuffs the clipboard, then ydotool synthesizes Ctrl+V.
+    # First wl-copy stuffs the clipboard, then ydotool synthesizes Shift+Insert.
     assert calls == [
         ["wl-copy"],
-        ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
+        ["ydotool", "key", "42:1", "110:1", "110:0", "42:0"],
     ]
 
 
