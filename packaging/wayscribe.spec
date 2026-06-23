@@ -3,7 +3,7 @@
 %global debug_package %{nil}
 
 Name:           wayscribe
-Version:        0.4.1
+Version:        0.4.2
 Release:        1%{?dist}
 Summary:        Hotkey voice-to-text and keyboard-layout fixer for KDE Plasma Wayland
 License:        MIT
@@ -69,6 +69,10 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/wayscribe.service
 %{_userunitdir}/wayscribe.service
 
 %changelog
+* Tue Jun 23 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.4.2-1
+- Autocorrect: report missing /dev/input access distinctly instead of the
+  misleading "no keyboard found"; hint to add the user to the 'input' group
+
 * Tue Jun 23 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.4.0-1
 - Layout fixer: `wayscribe fix` re-keys wrong-layout text (ghbdtn -> привет)
   via a static ЙЦУКЕН↔QWERTY map + trigram detection; operates on the

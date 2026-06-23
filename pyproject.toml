@@ -1,6 +1,6 @@
 [project]
 name = "wayscribe"
-version = "0.4.1"
+version = "0.4.2"
 description = "Hotkey-driven voice-to-text for KDE Plasma Wayland, backed by FastFlowLM Whisper on AMD NPU"
 readme = "README.md"
 requires-python = ">=3.11"

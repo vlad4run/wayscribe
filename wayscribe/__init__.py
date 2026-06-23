@@ -4,7 +4,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 
 def _git_hash() -> tuple[str, bool] | None:
