@@ -22,4 +22,6 @@ def test_wrong_layout_junk_scores_low_in_both() -> None:
 
 def test_short_and_empty_do_not_crash() -> None:
     assert langdetect.score("") == {"ru": 0.0, "en": 0.0}
-    assert langdetect.score("ab") == {"ru": 0.0, "en": 0.0}
+    # Space-padding gives 1-2 char strings real trigrams; result stays well-formed.
+    s = langdetect.score("ab")
+    assert set(s) == {"ru", "en"} and all(0.0 <= v <= 1.0 for v in s.values())
