@@ -12,3 +12,6 @@ deploy/.env
 *.wav
 *.ogg
 !sample_audio.ogg
+
+# Generated at build time by scripts/build-binary.sh
+wayscribe/_buildinfo.py

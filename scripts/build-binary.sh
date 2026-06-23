@@ -52,6 +52,15 @@ fi
 echo ">>> Cleaning previous build artifacts"
 rm -rf build/ dist/ wayscribe.spec
 
+# Bake the git build hash into the binary: PyInstaller's output has no .git, so
+# version_string() reads wayscribe/_buildinfo.py instead. Generated here, removed
+# on exit (gitignored), pulled into the binary by --collect-submodules wayscribe.
+GIT_HASH="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+GIT_DIRTY="$([ -n "$(git status --porcelain 2>/dev/null)" ] && echo True || echo False)"
+printf 'GIT_HASH = "%s"\nGIT_DIRTY = %s\n' "$GIT_HASH" "$GIT_DIRTY" > wayscribe/_buildinfo.py
+trap 'rm -f "$ROOT/wayscribe/_buildinfo.py"' EXIT
+echo ">>> Baked build hash ${GIT_HASH} (dirty=${GIT_DIRTY})"
+
 echo ">>> Building single-file binary"
 "$PY" -m PyInstaller \
     --onefile \

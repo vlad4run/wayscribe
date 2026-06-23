@@ -3,7 +3,7 @@
 %global debug_package %{nil}
 
 Name:           wayscribe
-Version:        0.4.0
+Version:        0.4.1
 Release:        1%{?dist}
 Summary:        Hotkey voice-to-text and keyboard-layout fixer for KDE Plasma Wayland
 License:        MIT

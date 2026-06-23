@@ -8,8 +8,12 @@ import sys
 
 
 def build_parser() -> argparse.ArgumentParser:
+    from wayscribe import version_string
+
     parser = argparse.ArgumentParser(prog="wayscribe")
+    parser.add_argument("-V", "--version", action="version", version=version_string())
     sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("version", help="Print version and git build hash")
     sub.add_parser("daemon", help="Run the long-lived daemon (foreground; for systemd)")
     sub.add_parser("toggle", help="Toggle recording (start if idle, stop if recording)")
     sub.add_parser("status", help="Print daemon state as JSON")
@@ -80,6 +84,11 @@ def cmd_log(follow: bool, lines: int) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    if args.cmd == "version":
+        from wayscribe import version_string
+        print(version_string())
+        return 0
 
     if args.cmd == "daemon":
         from wayscribe.daemon import run
