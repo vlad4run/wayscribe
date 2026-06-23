@@ -209,7 +209,11 @@ class AutocorrectEngine:
         except Exception:
             log.exception("autocorrect: failed to apply correction")
             return
-        if self.cfg.switch_layout and c.target:
+        # Live autocorrect always flips the layout to the corrected text's
+        # language (Punto-Switcher style): without it the next word is typed in
+        # the same wrong layout and re-triggers a fix every time. The
+        # `switch_layout` config flag governs only the explicit `fix` command.
+        if c.target:
             await keyboard.set_layout_by_lang(c.target)
         fixed = c.text.rstrip(" ")
         await asyncio.to_thread(

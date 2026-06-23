@@ -49,7 +49,8 @@ class Config:
     # Layout fixer (ghbdtn -> привет)
     fix_source: str = "selection"  # "selection" | "last_word"
     fix_last_word_count: int = 1
-    switch_layout: bool = False  # also flip the active KDE layout after a fix
+    # flip KDE layout after the `fix` command; live autocorrect always flips
+    switch_layout: bool = False
     trigram_confidence_min: float = 0.15  # below this, defer to the LLM (if enabled)
     # LLM (chat) — separate from the STT endpoint above
     llm_endpoint: str = ""  # empty disables all LLM features

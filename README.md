@@ -200,7 +200,7 @@ vad_rms_threshold = 500.0             # higher = needs louder speech
 # Layout fixer (`wayscribe fix` / `translate` / `autocorrect`)
 fix_source = "selection"              # "selection" (PRIMARY) or "last_word" (synth Ctrl+Shift+Left)
 fix_last_word_count = 1               # words to grab in "last_word" mode
-switch_layout = false                 # flip the active KDE layout after a fix
+switch_layout = false                 # flip KDE layout after the `fix` command (live autocorrect always flips)
 trigram_confidence_min = 0.15         # below this, defer to the LLM (if configured)
 llm_endpoint = ""                     # OpenAI-compatible chat URL; empty disables LLM features
 llm_model = ""                        # chat model name
