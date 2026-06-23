@@ -3,9 +3,9 @@
 %global debug_package %{nil}
 
 Name:           wayscribe
-Version:        0.3.0
+Version:        0.4.0
 Release:        1%{?dist}
-Summary:        Hotkey voice-to-text for KDE Plasma Wayland (Whisper on AMD NPU)
+Summary:        Hotkey voice-to-text and keyboard-layout fixer for KDE Plasma Wayland
 License:        MIT
 
 # Sources are staged by scripts/build-rpm.sh into %%{_topdir}/SOURCES.
@@ -25,16 +25,23 @@ ExclusiveArch:  x86_64
 Requires:       libportaudio2
 Recommends:     wl-clipboard
 Recommends:     libnotify-tools
+# ydotool: keystroke synthesis for auto-type and the layout fixer write-back
+# (and required by the opt-in global autocorrect).
+Recommends:     ydotool
 
 %description
-wayscribe is a headless voice-to-text daemon for KDE Plasma Wayland. A
-global hotkey starts and stops recording; audio is transcribed by Whisper
-V3 Turbo running on the AMD Ryzen AI NPU (via FastFlowLM) and the result
-lands in the clipboard, with a KDE notification preview.
+wayscribe is a headless daemon for KDE Plasma Wayland. A global hotkey
+starts and stops recording; audio is transcribed by an OpenAI-compatible
+speech-to-text backend and the result lands in the clipboard, with a KDE
+notification preview. It also fixes text typed in the wrong keyboard layout
+(ghbdtn -> привет) and can spell-fix or translate a selection via a local
+LLM endpoint.
 
-The Whisper inference engine itself runs in a separate FastFlowLM Docker
-container (not packaged here); see the project README for setup of the
-NPU backend and KDE hotkey bindings.
+Transcription and the optional LLM run in separate local backends reached
+over HTTP — any OpenAI-compatible server works. The reference setup runs
+Whisper V3 Turbo on an AMD Ryzen AI NPU via a FastFlowLM Docker container
+(not packaged here); see the project README and BACKEND.md for backend
+setup and KDE hotkey bindings.
 
 %prep
 %setup -q -T -c -n %{name}-%{version}
@@ -62,6 +69,17 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/wayscribe.service
 %{_userunitdir}/wayscribe.service
 
 %changelog
+* Tue Jun 23 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.4.0-1
+- Layout fixer: `wayscribe fix` re-keys wrong-layout text (ghbdtn -> привет)
+  via a static ЙЦУКЕН↔QWERTY map + trigram detection; operates on the
+  selection or the just-typed word
+- LLM features (need a separate chat endpoint): `fix --spell` for
+  spelling/grammar cleanup and `wayscribe translate` to English
+- Phase-2 global autocorrect (opt-in, keylogger-class): `wayscribe
+  autocorrect [on|off|toggle]`, gated by `evdev_autocorrect` in config;
+  reads /dev/input via the bundled evdev (when built with it)
+- Recommends ydotool (keystroke synthesis for auto-type / fix write-back)
+
 * Wed Jun 17 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.3.0-1
 - Auto-type: paste non-ASCII (e.g. Cyrillic) transcripts via clipboard +
   Ctrl+V, since `ydotool type` emits ASCII keycodes only

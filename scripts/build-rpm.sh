@@ -8,6 +8,8 @@
 #
 # Builds the binary first via scripts/build-binary.sh if dist/wayscribe
 # is missing. Pass FORCE_REBUILD=1 to always rebuild the binary.
+# WITH_EVDEV=1 passes through to build-binary.sh to bundle the optional
+# global-autocorrect dependency (evdev) into the packaged binary.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
