@@ -6,8 +6,8 @@ The tables are embedded `.py` constants (no corpus file, no package-data) — th
 need not be exhaustive: the layout fixer only compares two candidate spellings
 and picks the more plausible one, so relative coverage is what matters.
 
-`score("привет") -> {"ru": 1.0, "en": 0.0}`; `dominant` returns the winning
-language and a confidence in [0, 1] (the gap between the two scores).
+`score("привет") -> {"ru": 1.0, "en": 0.0}`. Callers compare the score of two
+candidate spellings (the text as typed vs. its layout re-key) to pick a winner.
 """
 from __future__ import annotations
 
@@ -52,16 +52,3 @@ def score(text: str) -> dict[str, float]:
     """Fraction of `text`'s trigrams found in each language's common set."""
     grams = _trigrams(text)
     return {"ru": _coverage(grams, _RU_TRIGRAMS), "en": _coverage(grams, _EN_TRIGRAMS)}
-
-
-def dominant(text: str) -> tuple[str, float]:
-    """Best-guess language and a confidence (score gap) in [0, 1].
-
-    Confidence 0 means undecidable (tie, or a string too short to have
-    trigrams); the layout fixer uses a threshold on it to decide whether to
-    fall back to the LLM.
-    """
-    s = score(text)
-    if s["ru"] >= s["en"]:
-        return "ru", s["ru"] - s["en"]
-    return "en", s["en"] - s["ru"]

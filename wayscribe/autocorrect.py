@@ -114,7 +114,11 @@ class AutocorrectEngine:
         self.buf = WordBuffer()
         self._shift = False
 
-    def _find_keyboards(self, evdev):  # type: ignore[no-untyped-def]
+    def _fail(self, reason: str) -> None:
+        log.warning("autocorrect: %s", reason)
+        output.notify("wayscribe", f"autocorrect failed: {reason}", icon="dialog-error")
+
+    def _find_keyboards(self, evdev):
         """Real keyboard devices, excluding our own/virtual injectors."""
         ecodes = evdev.ecodes
         found = []
@@ -138,24 +142,16 @@ class AutocorrectEngine:
         try:
             import evdev
         except ImportError:
-            log.warning("autocorrect: python-evdev not installed")
-            output.notify(
-                "wayscribe", "autocorrect failed: python-evdev not installed",
-                icon="dialog-error",
-            )
+            self._fail("python-evdev not installed")
             return
 
         try:
             devices = self._find_keyboards(evdev)
-        except PermissionError as exc:
-            log.warning("autocorrect: no permission for /dev/input: %s", exc)
-            output.notify("wayscribe", "autocorrect failed: no /dev/input access",
-                          icon="dialog-error")
+        except PermissionError:
+            self._fail("no /dev/input access")
             return
         if not devices:
-            log.warning("autocorrect: no keyboard devices found")
-            output.notify("wayscribe", "autocorrect failed: no keyboard found",
-                          icon="dialog-error")
+            self._fail("no keyboard found")
             return
 
         ui = None
@@ -183,7 +179,7 @@ class AutocorrectEngine:
                 ui.close()
             log.info("autocorrect: released keyboards")
 
-    async def _pump(self, dev, ui, evdev) -> None:  # type: ignore[no-untyped-def]
+    async def _pump(self, dev, ui, evdev) -> None:
         ecodes = evdev.ecodes
         async for ev in dev.async_read_loop():
             # Replay the original event (the grab swallowed it from the app).
