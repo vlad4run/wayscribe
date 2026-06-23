@@ -138,6 +138,10 @@ types itself into whatever window has focus — no paste needed.
 | `wayscribe lang` | Show the current transcription language. |
 | `wayscribe lang next` | Cycle to the next language in `languages`. |
 | `wayscribe lang ru` / `en` / `auto` | Set the language; `auto` lets Whisper detect it. |
+| `wayscribe fix` | Fix wrong-layout text in the selection (`ghbdtn` → `привет`). |
+| `wayscribe fix --spell` | Also LLM-correct spelling/grammar after re-keying (needs `llm_endpoint`). |
+| `wayscribe translate` | Translate the selection to English (needs `llm_endpoint`). |
+| `wayscribe autocorrect [on\|off\|toggle]` | Toggle global auto-layout-fix as you type (needs `evdev_autocorrect = true`). |
 | `wayscribe log [-f] [-n N]` | Tail the daemon journal (systemd `--user` unit). |
 
 Quick smoke test once everything is up:
@@ -178,6 +182,17 @@ auto_stop = false                     # opt-in: silence-detection auto-stop
 auto_stop_silence_sec = 1.5           # required quiet window after first speech
 auto_stop_min_record_sec = 0.8        # never auto-stop in the first N seconds
 vad_rms_threshold = 500.0             # higher = needs louder speech
+
+# Layout fixer (`wayscribe fix` / `translate` / `autocorrect`)
+fix_source = "selection"              # "selection" (PRIMARY) or "last_word" (synth Ctrl+Shift+Left)
+fix_last_word_count = 1               # words to grab in "last_word" mode
+switch_layout = false                 # flip the active KDE layout after a fix
+trigram_confidence_min = 0.15         # below this, defer to the LLM (if configured)
+llm_endpoint = ""                     # OpenAI-compatible chat URL; empty disables LLM features
+llm_model = ""                        # chat model name
+llm_api_key = ""                      # for external endpoints
+llm_timeout_sec = 30.0
+evdev_autocorrect = false             # master gate for global autocorrect (keylogger-class)
 ```
 
 `endpoint` and `model` select the transcription backend — point them at a LAN
@@ -213,6 +228,24 @@ maps it to a language (`us`/`gb` → `en`, others pass through), so the
 `wayscribe lang` changes are overwritten on the next recording — set it to
 `false` to pin the language yourself. Best-effort: on a non-KDE session it
 silently keeps the configured `language`.
+
+**Layout fixer** — `wayscribe fix` re-keys wrong-layout text (`ghbdtn` →
+`привет`) using a static ЙЦУКЕН↔QWERTY map; trigram scoring picks the direction
+and confidence, so already-correct text is left alone. It operates on the
+PRIMARY selection (`fix_source = "selection"`) — highlight the word first — or on
+the just-typed word (`"last_word"`, synthesizes Ctrl+Shift+Left). Bind it to a
+hotkey for a one-key fix. With `llm_endpoint` set (an OpenAI-compatible chat
+endpoint — a second FLM container per [BACKEND.md](BACKEND.md), or any external
+server), `fix --spell` also cleans up spelling/grammar and `wayscribe translate`
+renders the selection in English.
+
+**Global autocorrect** *(experimental, opt-in, keylogger-class)* — `evdev_autocorrect
+= true` unlocks `wayscribe autocorrect [on|off|toggle]`, which reads the physical
+keyboard via `/dev/input` (requires the `evdev` extra and membership in the
+`input` group) and fixes wrong-layout words automatically as you type. It takes
+an exclusive grab of the keyboard and replays keystrokes, so it is off by default
+and gated behind both the config flag *and* a runtime toggle. Install with
+`pip install wayscribe[evdev]`. Verify the setup with `wayscribe doctor`.
 
 ## Troubleshooting
 

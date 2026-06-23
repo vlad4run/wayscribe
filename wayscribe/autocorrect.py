@@ -1,0 +1,221 @@
+"""Phase-2 global autocorrect: watch the physical keyboard, fix wrong-layout
+words as you type (Punto-Switcher style).
+
+Security-sensitive (keylogger-class): gated behind `evdev_autocorrect` in config
+and toggled at runtime by a hotkey (`wayscribe autocorrect`). The pure core
+(`KEYCODE_CHARS`, `WordBuffer`) carries no evdev dependency so it is unit-tested
+without a device; the live `AutocorrectEngine` imports `evdev` lazily.
+
+The engine takes an exclusive grab (EVIOCGRAB) of each keyboard and replays
+every event through a UInput device, so synthesized corrections (emitted via
+ydotool, a *different* uinput device we do not watch) never feed back into our
+buffer. Corrections reuse the Phase-1 output path (`output.backspace` +
+`output.type_text`).
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass
+
+from wayscribe import keyboard, layout, output, selection
+from wayscribe.config import Config
+
+log = logging.getLogger("wayscribe")
+
+# evdev key codes (== evdev.ecodes.KEY_*) -> (unshifted, shifted) US-QWERTY glyph.
+# Mirrors the bijective set in layout.py; digits/space/etc. are handled separately.
+KEYCODE_CHARS: dict[int, tuple[str, str]] = {
+    16: ("q", "Q"), 17: ("w", "W"), 18: ("e", "E"), 19: ("r", "R"), 20: ("t", "T"),
+    21: ("y", "Y"), 22: ("u", "U"), 23: ("i", "I"), 24: ("o", "O"), 25: ("p", "P"),
+    26: ("[", "{"), 27: ("]", "}"),
+    30: ("a", "A"), 31: ("s", "S"), 32: ("d", "D"), 33: ("f", "F"), 34: ("g", "G"),
+    35: ("h", "H"), 36: ("j", "J"), 37: ("k", "K"), 38: ("l", "L"),
+    39: (";", ":"), 40: ("'", '"'), 41: ("`", "~"),
+    44: ("z", "Z"), 45: ("x", "X"), 46: ("c", "C"), 47: ("v", "V"), 48: ("b", "B"),
+    49: ("n", "N"), 50: ("m", "M"), 51: (",", "<"), 52: (".", ">"), 53: ("/", "?"),
+}
+
+MOD_CODES: frozenset[int] = frozenset({42, 54})  # KEY_LEFTSHIFT, KEY_RIGHTSHIFT
+SPACE = 57
+BACKSPACE = 14
+ENTER = 28
+TAB = 15
+
+
+@dataclass
+class Correction:
+    """A rewrite to apply: delete `backspaces` chars, then type `text`."""
+
+    backspaces: int
+    text: str
+    target: str | None  # language of the corrected text ('ru'/'en') for layout switch
+    original: str  # the on-screen wrong-layout word, for the notification preview
+
+
+class WordBuffer:
+    """Accumulates US-QWERTY glyphs from key presses; emits the raw word at a
+    boundary.
+
+    Pure and layout-agnostic: it records the *physical* keys (mapped to US
+    glyphs), not what the active layout actually inserted. Reconstructing the
+    on-screen text and deciding a correction is `decide`'s job, because that
+    needs the active layout — which the buffer deliberately does not track.
+    """
+
+    def __init__(self) -> None:
+        self._chars: list[str] = []
+
+    def feed(self, code: int, shift: bool) -> str | None:
+        """Feed one key press. Returns the completed raw word at SPACE, else None."""
+        if code in MOD_CODES:
+            return None
+        if code == BACKSPACE:
+            if self._chars:
+                self._chars.pop()
+            return None
+        if code in KEYCODE_CHARS:
+            lo, hi = KEYCODE_CHARS[code]
+            self._chars.append(hi if shift else lo)
+            return None
+        if code == SPACE:
+            word = "".join(self._chars)
+            self._chars = []
+            return word or None
+        # ENTER / TAB / arrows / shortcuts: the cursor may have moved, so the
+        # buffer no longer reflects what is on screen — drop it.
+        self._chars = []
+        return None
+
+
+def decide(raw: str, active_lang: str | None, confidence_min: float) -> Correction | None:
+    """Decide whether the raw keystrokes were typed in the wrong layout.
+
+    `raw` is the US-QWERTY reading of the physical keys; `active_lang` is the
+    layout actually in effect, so the on-screen text is `raw` (Latin layout) or
+    its Cyrillic re-key (Russian layout). We then run the Phase-1 plausibility
+    check on that on-screen text and correct only when confident.
+    """
+    onscreen = layout.en_to_ru(raw) if active_lang == "ru" else raw
+    cand, conf, target = selection.propose_correction(onscreen)
+    if cand == onscreen or conf < confidence_min:
+        return None
+    # +1 backspace for the space already typed; re-append it after the fix.
+    return Correction(
+        backspaces=len(onscreen) + 1, text=cand + " ", target=target, original=onscreen
+    )
+
+
+class AutocorrectEngine:
+    """Live evdev grab+replay loop. Constructed only when the feature is on."""
+
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+        self.buf = WordBuffer()
+        self._shift = False
+
+    def _find_keyboards(self, evdev):  # type: ignore[no-untyped-def]
+        """Real keyboard devices, excluding our own/virtual injectors."""
+        ecodes = evdev.ecodes
+        found = []
+        for path in evdev.list_devices():
+            try:
+                dev = evdev.InputDevice(path)
+            except OSError:
+                continue
+            caps = dev.capabilities()
+            keys = caps.get(ecodes.EV_KEY, [])
+            name = (dev.name or "").lower()
+            if ecodes.KEY_A in keys and not any(
+                tag in name for tag in ("ydotool", "uinput", "wayscribe")
+            ):
+                found.append(dev)
+            else:
+                dev.close()
+        return found
+
+    async def run(self) -> None:
+        try:
+            import evdev
+        except ImportError:
+            log.warning("autocorrect: python-evdev not installed")
+            output.notify(
+                "wayscribe", "autocorrect failed: python-evdev not installed",
+                icon="dialog-error",
+            )
+            return
+
+        try:
+            devices = self._find_keyboards(evdev)
+        except PermissionError as exc:
+            log.warning("autocorrect: no permission for /dev/input: %s", exc)
+            output.notify("wayscribe", "autocorrect failed: no /dev/input access",
+                          icon="dialog-error")
+            return
+        if not devices:
+            log.warning("autocorrect: no keyboard devices found")
+            output.notify("wayscribe", "autocorrect failed: no keyboard found",
+                          icon="dialog-error")
+            return
+
+        ui = None
+        grabbed: list = []
+        try:
+            ui = evdev.UInput.from_device(*devices, name="wayscribe-autocorrect")
+            for dev in devices:
+                dev.grab()
+                grabbed.append(dev)
+            log.info("autocorrect: grabbed %d keyboard(s)", len(grabbed))
+            await asyncio.gather(*(self._pump(dev, ui, evdev) for dev in grabbed))
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("autocorrect engine crashed")
+            output.notify("wayscribe", "autocorrect stopped (error)", icon="dialog-error")
+        finally:
+            for dev in grabbed:
+                try:
+                    dev.ungrab()
+                except Exception:
+                    pass
+                dev.close()
+            if ui is not None:
+                ui.close()
+            log.info("autocorrect: released keyboards")
+
+    async def _pump(self, dev, ui, evdev) -> None:  # type: ignore[no-untyped-def]
+        ecodes = evdev.ecodes
+        async for ev in dev.async_read_loop():
+            # Replay the original event (the grab swallowed it from the app).
+            ui.write_event(ev)
+            ui.syn()
+            if ev.type != ecodes.EV_KEY:
+                continue
+            if ev.code in MOD_CODES:
+                self._shift = ev.value != 0  # press/repeat = held, release = up
+                continue
+            if ev.value != 1:  # act on key-press only (skip release/repeat)
+                continue
+            word = self.buf.feed(ev.code, self._shift)
+            if word is not None:
+                await self._handle_word(word)
+
+    async def _handle_word(self, raw: str) -> None:
+        active = await keyboard.current_layout_lang()
+        correction = decide(raw, active, self.cfg.trigram_confidence_min)
+        if correction is not None:
+            await self._apply(correction)
+
+    async def _apply(self, c: Correction) -> None:
+        try:
+            await asyncio.to_thread(output.backspace, c.backspaces)
+            await asyncio.to_thread(output.type_text, c.text)
+        except Exception:
+            log.exception("autocorrect: failed to apply correction")
+            return
+        if self.cfg.switch_layout and c.target:
+            await keyboard.set_layout_by_lang(c.target)
+        fixed = c.text.rstrip(" ")
+        await asyncio.to_thread(
+            output.notify, "wayscribe", f"{c.original} → {fixed}", "dialog-information"
+        )

@@ -21,6 +21,10 @@ dev = [
 build = [
     "pyinstaller>=6",
 ]
+# Optional: Phase-2 global evdev autocorrect (reads /dev/input — keylogger-class).
+evdev = [
+    "evdev>=1.6",
+]
 
 [project.scripts]
 wayscribe = "wayscribe.__main__:main"
@@ -45,12 +49,14 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 "wayscribe/layout.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/langdetect.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/selection.py" = ["RUF001", "RUF002", "RUF003"]
+"wayscribe/autocorrect.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/daemon.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/output.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_layout.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_langdetect.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_selection.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_fix.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_autocorrect.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

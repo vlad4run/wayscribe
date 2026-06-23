@@ -41,3 +41,22 @@
 # auto_stop_silence_sec = 1.5           # required quiet window after first speech
 # auto_stop_min_record_sec = 0.8        # never auto-stop in the first N seconds
 # vad_rms_threshold = 500.0             # higher = needs louder speech
+
+# --- Layout fixer (`wayscribe fix` / `translate` / `autocorrect`) ------------
+# fix_source = "selection"              # "selection" (PRIMARY) or "last_word"
+                                        # ("last_word" synthesizes Ctrl+Shift+Left)
+# fix_last_word_count = 1               # words to grab in "last_word" mode
+# switch_layout = false                 # flip the active KDE layout after a fix
+# trigram_confidence_min = 0.15         # below this, defer to the LLM (if configured)
+
+# --- LLM (chat) — separate from the STT endpoint above -----------------------
+# llm_endpoint = ""                     # OpenAI-compatible chat URL; empty = LLM off
+                                        # (a 2nd FLM container per BACKEND.md, or external)
+# llm_model = ""                        # chat model name
+# llm_api_key = ""                      # for external endpoints
+# llm_timeout_sec = 30.0
+
+# --- Global autocorrect (experimental, opt-in, KEYLOGGER-CLASS) --------------
+# evdev_autocorrect = false             # master gate: reads /dev/input as you type.
+                                        # Needs the `evdev` extra + `input` group.
+                                        # Runtime on/off: `wayscribe autocorrect`.

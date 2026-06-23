@@ -1,4 +1,4 @@
-"""wayscribe CLI: daemon|toggle|status|stop|cancel|doctor|oneshot|lang|log|fix|translate."""
+"""wayscribe CLI: daemon, toggle, status, fix, translate, autocorrect, and more."""
 from __future__ import annotations
 
 import argparse
@@ -32,6 +32,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--spell", action="store_true", help="Also LLM-correct spelling/grammar after re-keying"
     )
     sub.add_parser("translate", help="Translate the selection to English (needs LLM)")
+    ac = sub.add_parser(
+        "autocorrect",
+        help="Toggle global auto-layout-fix (needs evdev_autocorrect=true in config)",
+    )
+    ac.add_argument(
+        "value",
+        nargs="?",
+        choices=["on", "off", "toggle"],
+        default="toggle",
+        help="on / off / toggle (default toggle)",
+    )
     logp = sub.add_parser("log", help="Show the daemon journal (systemd --user unit)")
     logp.add_argument("-f", "--follow", action="store_true", help="Follow new log lines")
     logp.add_argument(
@@ -99,6 +110,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "translate":
         from wayscribe.ipc import send_command
         return send_command("translate")
+
+    if args.cmd == "autocorrect":
+        from wayscribe.ipc import send_command
+        return send_command("autocorrect", value=args.value)
 
     if args.cmd == "log":
         return cmd_log(args.follow, args.lines)

@@ -53,6 +53,8 @@ class Daemon:
         self._notify_id: int | None = None
         self._notify_supported: bool = True
         self._notify_task: asyncio.Task[None] | None = None
+        # Phase-2 global autocorrect: None = off; a live task = grab active.
+        self._autocorrect_task: asyncio.Task[None] | None = None
 
     def _ensure_async_primitives(self) -> None:
         if self._lock is None:
@@ -77,6 +79,7 @@ class Daemon:
             "ok": True,
             "state": self.state.value,
             "language": self.cfg.language or "auto",
+            "autocorrect": "on" if self._autocorrect_active else "off",
         }
         if extra:
             snap.update(extra)
@@ -166,7 +169,39 @@ class Daemon:
                     return self._status_snapshot({"ok": False, "reason": "busy"})
                 return await self._translate_locked()
 
+            if cmd == "autocorrect":
+                if not self.cfg.evdev_autocorrect:
+                    output.notify(
+                        "wayscribe",
+                        "autocorrect disabled (set evdev_autocorrect=true)",
+                        icon="dialog-error",
+                    )
+                    return self._status_snapshot({"ok": False, "reason": "autocorrect-disabled"})
+                return await self._set_autocorrect(msg.get("value") or "toggle")
+
             return {"ok": False, "error": f"unknown command: {cmd!r}"}
+
+    @property
+    def _autocorrect_active(self) -> bool:
+        return self._autocorrect_task is not None and not self._autocorrect_task.done()
+
+    async def _set_autocorrect(self, want: str) -> dict[str, Any]:
+        """Start/stop the evdev grab. `want` is 'on' | 'off' | 'toggle'."""
+        active = self._autocorrect_active
+        target_on = not active if want == "toggle" else want == "on"
+        if target_on and not active:
+            from wayscribe.autocorrect import AutocorrectEngine
+
+            engine = AutocorrectEngine(self.cfg)
+            self._autocorrect_task = asyncio.create_task(engine.run())
+            output.notify("wayscribe", "autocorrect ON", icon="media-record")
+            log.info("autocorrect enabled")
+        elif not target_on and active:
+            await _drain_task(self._autocorrect_task)
+            self._autocorrect_task = None
+            output.notify("wayscribe", "autocorrect OFF", icon="dialog-information")
+            log.info("autocorrect disabled")
+        return self._status_snapshot()
 
     async def _grab_selection(self) -> str:
         """Capture the text to fix from the configured source (offloaded I/O)."""
@@ -525,6 +560,7 @@ async def _serve(daemon: Daemon) -> None:
     finally:
         daemon._cancel_watchdogs()
         await _drain_task(warmup_task)
+        await _drain_task(daemon._autocorrect_task)
         await _drain_task(daemon._inflight)
         if daemon.recorder.is_recording:
             await asyncio.to_thread(daemon.recorder.stop)
