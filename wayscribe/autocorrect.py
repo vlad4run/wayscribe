@@ -215,8 +215,11 @@ class AutocorrectEngine:
         # `switch_layout` config flag governs only the explicit `fix` command.
         if c.target:
             await keyboard.set_layout_by_lang(c.target)
+        # NB: never log c.original / the corrected text — this engine sees every
+        # keystroke, so journaling typed words would leak passwords and private
+        # content into a persistent, admin-readable log. The transient notify is
+        # the only surface allowed to show the word.
         fixed = c.text.rstrip(" ")
-        log.info("autocorrect: %r -> %r (target=%s)", c.original, fixed, c.target)
         await asyncio.to_thread(
             output.notify, "wayscribe", f"{c.original} → {fixed}", "dialog-information"
         )
