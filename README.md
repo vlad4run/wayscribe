@@ -1,16 +1,19 @@
-# wayscribe — hotkey voice-to-text for KDE Plasma Wayland
+# wayscribe — hotkey voice-to-text & layout fixer for KDE Plasma Wayland
 
-Press a global hotkey, speak, press it again. Your audio is transcribed by
-**Whisper V3 Turbo** running on the **AMD Ryzen AI NPU**, and the text lands in
-your clipboard — optionally typed straight into the focused window, always with
-a KDE notification preview. Headless: no GUI windows, just a background daemon
-and a couple of hotkeys.
+Press a global hotkey, speak, press it again — your words land in the clipboard,
+optionally typed straight into the focused window, always with a KDE
+notification preview. wayscribe also **fixes text typed in the wrong keyboard
+layout** (`ghbdtn` → `привет`) and can **spell-fix or translate** a selection
+through a local LLM. Headless: no GUI windows, just a background daemon and a
+couple of hotkeys.
 
 **Targeted at KDE Plasma on Wayland**: input/output is Wayland-native
-(`wl-copy`, `wtype`, `notify-send`, KDE D-Bus). The transcription itself runs in
-a separate backend — built for the AMD Ryzen AI NPU, but the app only speaks
-plain HTTP, so any OpenAI-compatible speech-to-text server works. Backend setup,
-the NPU stack, and alternatives all live in **[BACKEND.md](BACKEND.md)**.
+(`wl-copy`, `ydotool`/`wtype`, `notify-send`, KDE D-Bus). Transcription and the
+optional LLM features run in **separate local backends** that wayscribe only
+talks to over plain HTTP — any OpenAI-compatible speech-to-text or chat server
+works, on whatever hardware you have. The reference STT setup runs Whisper V3
+Turbo on an **AMD Ryzen AI NPU**, but that is just one option; backend setup and
+alternatives live in **[BACKEND.md](BACKEND.md)**.
 
 > Building from source, packaging, or hacking on the code? See
 > **[DEVELOPMENT.md](DEVELOPMENT.md)**. This README is for installing and using
@@ -23,7 +26,7 @@ flowchart TD
     KDE["KDE Custom Shortcut<br/>(Meta+Alt+Space)"] -->|exec| Toggle["wayscribe toggle"]
     Toggle -->|Unix socket| Daemon["wayscribe daemon<br/>(asyncio)"]
     Daemon --> Recorder["Recorder<br/>(microphone)"]
-    Daemon -->|WAV over HTTP| Backend["STT backend<br/>(Whisper on NPU by default)"]
+    Daemon -->|WAV over HTTP| Backend["local STT backend<br/>(OpenAI-compatible)"]
     Backend -->|transcript| Daemon
     Daemon --> Output["clipboard · type · notification"]
 ```
@@ -31,7 +34,7 @@ flowchart TD
 1. The hotkey runs `wayscribe toggle`, a thin client that sends one command to
    the long-lived **daemon** over a Unix socket — so the response is instant.
 2. First toggle starts recording the mic; second toggle stops and POSTs the WAV
-   to the **[transcription backend](BACKEND.md)** (Whisper on the NPU by default).
+   to the **[transcription backend](BACKEND.md)** (any OpenAI-compatible STT).
 3. The transcript fans out to your configured outputs: clipboard (`wl-copy`),
    keystroke injection (`ydotool`; `wtype` on wlroots), and a KDE notification.
 
@@ -40,11 +43,19 @@ IDLE`). Safety rails: a max-duration watchdog auto-stops a forgotten recording,
 and an opt-in silence detector can stop recording for you after you stop
 talking.
 
+Beyond dictation, the same daemon powers the **layout fixer** (`wayscribe fix` —
+re-keys wrong-layout text via a static ЙЦУКЕН↔QWERTY map + trigram detection)
+and, when a local LLM endpoint is configured, **spell-fix and translate** on the
+current selection. See [Usage](#usage) and [Configuration](#configuration).
+
 ## Requirements
 
 - **KDE Plasma on Wayland.** Packaged as an openSUSE RPM.
-- **A transcription backend** reachable over HTTP — the FLM container running
-  Whisper on the NPU, or any OpenAI-compatible STT. See [BACKEND.md](BACKEND.md).
+- **A transcription backend** reachable over HTTP — any OpenAI-compatible STT
+  server (the reference setup runs Whisper on an AMD Ryzen AI NPU). See
+  [BACKEND.md](BACKEND.md).
+- **(Optional) a chat LLM endpoint** for `fix --spell` / `translate` — any
+  OpenAI-compatible local server; off until `llm_endpoint` is set.
 - **Runtime dependencies** (the RPM pulls these in):
 
 | Package | Role | Required? |
@@ -95,9 +106,10 @@ config template at
 ### 3. Start a transcription backend
 
 wayscribe needs an OpenAI-compatible STT server listening on `endpoint`
-(default `http://localhost:52625`). The reference backend is Whisper on the AMD
-Ryzen AI NPU via the FLM container — **see [BACKEND.md](BACKEND.md)** for the
-docker/compose setup and for using a different STT server.
+(default `http://localhost:52625`). Any such server works — local
+whisper.cpp/faster-whisper, a LAN host, or the reference FLM container running
+Whisper on an AMD Ryzen AI NPU. **See [BACKEND.md](BACKEND.md)** for the
+docker/compose setup and alternatives.
 
 ### 4. Enable the daemon
 
@@ -118,6 +130,8 @@ In **System Settings → Shortcuts → Custom Shortcuts**, add commands and bind
 
 - `Meta+Alt+Space` → `wayscribe toggle` *(start/stop recording)*
 - `Meta+Alt+L` → `wayscribe lang next` *(cycle language; optional)*
+- `Meta+Alt+F` → `wayscribe fix` *(fix wrong-layout selection; optional)*
+- `Meta+Alt+T` → `wayscribe translate` *(translate selection to English; needs LLM)*
 
 > `Meta+Space` is Krunner — that's why the default is `Meta+Alt+Space`.
 
