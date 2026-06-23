@@ -111,18 +111,18 @@ wayscribe/
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e .[dev]        # add ,evdev to also build the phase-2 autocorrect dep
+.venv/bin/pip install -e .[dev]        # installs evdev too (core dep)
 .venv/bin/pytest -q                    # run tests (pytest-asyncio, asyncio_mode=auto)
 .venv/bin/pytest tests/test_vad.py::test_name   # single test
 .venv/bin/ruff check .                 # lint (E,F,I,B,UP,RUF; line-length 100)
 .venv/bin/ruff format .                # format
 ```
 
-`evdev` is an optional extra (`pip install -e .[dev,evdev]`) — only the phase-2
-global autocorrect needs it; everything else (and its tests) runs without it.
-ruff `per-file-ignores` exempt the Cyrillic-bearing modules (`layout.py`,
-`langdetect.py`, `selection.py`, `autocorrect.py`, …) from the ambiguous-glyph
-lints (`RUF001/2/3`).
+`evdev` is a core dependency, but `autocorrect.py` imports it lazily, so the rest
+of the app (and the whole test suite) runs even where evdev is missing or fails
+to build. ruff `per-file-ignores` exempt the Cyrillic-bearing modules
+(`layout.py`, `langdetect.py`, `selection.py`, `autocorrect.py`, …) from the
+ambiguous-glyph lints (`RUF001/2/3`).
 
 Smoke-test against a running FLM backend:
 

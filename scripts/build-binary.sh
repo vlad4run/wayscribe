@@ -8,14 +8,14 @@
 #   - For the output backends you intend to use: wl-clipboard, wtype/ydotool,
 #     libnotify-tools.
 #
-# The optional phase-2 global autocorrect needs python-evdev. It is NOT
-# bundled by default (keeps the binary lean; the feature is opt-in and
-# experimental). Set WITH_EVDEV=1 to install evdev into the build env and
-# bundle it, so `wayscribe autocorrect` works from the binary.
+# The global autocorrect needs python-evdev (a core dependency). It is bundled
+# by default so `wayscribe autocorrect` works from the binary. Set
+# WITHOUT_EVDEV=1 to skip it (leaner binary; that one feature then no-ops with a
+# "python-evdev not installed" notice).
 #
 # Usage:
-#   scripts/build-binary.sh                 # uses .venv (creates if missing)
-#   WITH_EVDEV=1 scripts/build-binary.sh    # also bundle evdev (autocorrect)
+#   scripts/build-binary.sh                    # uses .venv (creates if missing)
+#   WITHOUT_EVDEV=1 scripts/build-binary.sh    # skip the evdev bundle
 #   PY=/usr/bin/python3.12 scripts/build-binary.sh
 set -euo pipefail
 
@@ -36,9 +36,11 @@ if ! "$PY" -m PyInstaller --version >/dev/null 2>&1; then
 fi
 
 EVDEV_ARGS=()
-if [ "${WITH_EVDEV:-0}" = "1" ]; then
+if [ "${WITHOUT_EVDEV:-0}" = "1" ]; then
+    echo ">>> Skipping evdev bundle (WITHOUT_EVDEV=1) — autocorrect disabled in binary"
+else
     if ! "$PY" -c "import evdev" >/dev/null 2>&1; then
-        echo ">>> Installing evdev into $PY (WITH_EVDEV=1)"
+        echo ">>> Installing evdev into $PY"
         "$PY" -m pip install --quiet evdev
     fi
     # evdev is a C-extension with data + submodules (ecodes, _input); pull it

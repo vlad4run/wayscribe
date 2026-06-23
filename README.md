@@ -255,11 +255,17 @@ renders the selection in English.
 
 **Global autocorrect** *(experimental, opt-in, keylogger-class)* — `evdev_autocorrect
 = true` unlocks `wayscribe autocorrect [on|off|toggle]`, which reads the physical
-keyboard via `/dev/input` (requires the `evdev` extra and membership in the
-`input` group) and fixes wrong-layout words automatically as you type. It takes
-an exclusive grab of the keyboard and replays keystrokes, so it is off by default
-and gated behind both the config flag *and* a runtime toggle. Install with
-`pip install wayscribe[evdev]`. Verify the setup with `wayscribe doctor`.
+keyboard via `/dev/input` and fixes wrong-layout words automatically as you type.
+It takes an exclusive grab of the keyboard and replays keystrokes, so it is off
+by default and gated behind both the config flag *and* a runtime toggle. The
+`evdev` dependency ships with the RPM binary (and with `pip install wayscribe`);
+the only setup is **membership in the `input` group**:
+
+```bash
+sudo usermod -aG input "$USER"   # then re-login
+```
+
+Verify with `wayscribe doctor` (it checks the `input` group when the gate is on).
 
 ## Troubleshooting
 

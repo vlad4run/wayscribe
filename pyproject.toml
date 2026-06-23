@@ -10,6 +10,10 @@ dependencies = [
     "sounddevice>=0.4",
     "httpx>=0.27",
     "numpy>=1.26",
+    # Global autocorrect reads /dev/input (keylogger-class, opt-in at runtime via
+    # `wayscribe autocorrect` + the evdev_autocorrect config gate). Imported
+    # lazily, so a missing/uninstallable evdev only disables that one feature.
+    "evdev>=1.6",
 ]
 
 [project.optional-dependencies]
@@ -20,10 +24,6 @@ dev = [
 ]
 build = [
     "pyinstaller>=6",
-]
-# Optional: Phase-2 global evdev autocorrect (reads /dev/input — keylogger-class).
-evdev = [
-    "evdev>=1.6",
 ]
 
 [project.scripts]

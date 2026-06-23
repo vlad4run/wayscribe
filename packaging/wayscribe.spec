@@ -77,7 +77,7 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_userunitdir}/wayscribe.service
   spelling/grammar cleanup and `wayscribe translate` to English
 - Phase-2 global autocorrect (opt-in, keylogger-class): `wayscribe
   autocorrect [on|off|toggle]`, gated by `evdev_autocorrect` in config;
-  reads /dev/input via the bundled evdev (when built with it)
+  reads /dev/input via the bundled evdev (user must be in the 'input' group)
 - Recommends ydotool (keystroke synthesis for auto-type / fix write-back)
 
 * Wed Jun 17 2026 Vladislav Zverev <vladspbru@gmail.com> - 0.3.0-1
