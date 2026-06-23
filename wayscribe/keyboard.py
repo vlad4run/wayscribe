@@ -26,13 +26,14 @@ _INT_RE = re.compile(r"uint32\s+(\d+)")
 _CODE_RE = re.compile(r"\('([^']*)'")
 
 
-async def _gdbus(method: str, timeout: float = 2.0) -> str | None:
+async def _gdbus(method: str, *args: str, timeout: float = 2.0) -> str | None:
     try:
         proc = await asyncio.create_subprocess_exec(
             "gdbus", "call", "--session",
             "--dest", _DEST,
             "--object-path", _PATH,
             "--method", f"{_IFACE}.{method}",
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -55,6 +56,23 @@ def _xkb_to_iso(code: str) -> str | None:
     if len(code) == 2 and code.isalpha():
         return code
     return None
+
+
+async def set_layout_by_lang(lang: str) -> bool:
+    """Switch the active KDE layout to the one whose xkb code maps to `lang`.
+
+    Best-effort: returns False on any failure (non-KDE, layout not installed,
+    gdbus missing). Used after a layout fix so the next keystrokes land in the
+    corrected layout.
+    """
+    list_out = await _gdbus("getLayoutsList")
+    if list_out is None:
+        return False
+    codes = _CODE_RE.findall(list_out)
+    target = next((i for i, c in enumerate(codes) if _xkb_to_iso(c) == lang), None)
+    if target is None:
+        return False
+    return await _gdbus("setLayout", str(target)) is not None
 
 
 async def current_layout_lang() -> str | None:

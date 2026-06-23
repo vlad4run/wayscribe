@@ -52,8 +52,44 @@ def type_text(text: str) -> None:
         _ydotool_paste(text)
 
 
-# Ctrl+V via raw evdev keycodes: KEY_LEFTCTRL=29, KEY_V=47.
-_PASTE_KEYS = ["29:1", "47:1", "47:0", "29:0"]
+# Raw evdev keycodes used for synthesized chords (ydotool `key` takes CODE:STATE).
+_KEY_LEFTCTRL = 29
+_KEY_LEFTSHIFT = 42
+_KEY_BACKSPACE = 14
+_KEY_LEFT = 105
+_KEY_V = 47
+
+# Ctrl+V (paste): press ctrl, tap v, release ctrl.
+_PASTE_KEYS = [f"{_KEY_LEFTCTRL}:1", f"{_KEY_V}:1", f"{_KEY_V}:0", f"{_KEY_LEFTCTRL}:0"]
+
+
+def _require_ydotool() -> None:
+    if shutil.which("ydotool") is None:
+        raise RuntimeError("ydotool not found — required for keystroke synthesis")
+
+
+def backspace(count: int) -> None:
+    """Synthesize `count` Backspace presses via ydotool (deletes typed-but-wrong text)."""
+    if count <= 0:
+        return
+    _require_ydotool()
+    keys = [f"{_KEY_BACKSPACE}:1", f"{_KEY_BACKSPACE}:0"] * count
+    subprocess.run(["ydotool", "key", *keys], check=True)
+
+
+def select_words_left(count: int) -> None:
+    """Select `count` words to the left (Ctrl+Shift+Left × count) via ydotool.
+
+    Used to grab the just-typed word(s) into the selection when no explicit
+    selection exists. Tap Left while Ctrl+Shift are held, then release both.
+    """
+    if count <= 0:
+        return
+    _require_ydotool()
+    keys = [f"{_KEY_LEFTCTRL}:1", f"{_KEY_LEFTSHIFT}:1"]
+    keys += [f"{_KEY_LEFT}:1", f"{_KEY_LEFT}:0"] * count
+    keys += [f"{_KEY_LEFTSHIFT}:0", f"{_KEY_LEFTCTRL}:0"]
+    subprocess.run(["ydotool", "key", *keys], check=True)
 
 
 def _ydotool_paste(text: str) -> None:

@@ -39,6 +39,19 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# Cyrillic↔Latin layout fixer: ambiguous-character lints (RUF001/2/3) fire on
+# the intentional Cyrillic glyphs in keymaps, trigram tables, and test data.
+"wayscribe/layout.py" = ["RUF001", "RUF002", "RUF003"]
+"wayscribe/langdetect.py" = ["RUF001", "RUF002", "RUF003"]
+"wayscribe/selection.py" = ["RUF001", "RUF002", "RUF003"]
+"wayscribe/daemon.py" = ["RUF001", "RUF002", "RUF003"]
+"wayscribe/output.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_layout.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_langdetect.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_selection.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_fix.py" = ["RUF001", "RUF002", "RUF003"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

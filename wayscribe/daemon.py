@@ -9,12 +9,12 @@ import asyncio
 import json
 import logging
 import signal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import httpx
 
-from wayscribe import keyboard, output, vad
+from wayscribe import keyboard, llm, output, selection, vad
 from wayscribe.config import Config, socket_path
 from wayscribe.recorder import Recorder, silent_wav
 from wayscribe.transcriber import probe_async, transcribe_async
@@ -31,7 +31,7 @@ def _fmt_mmss(seconds: float) -> str:
     return f"{total // 60}:{total % 60:02d}"
 
 
-class State(str, Enum):
+class State(StrEnum):
     IDLE = "idle"
     RECORDING = "recording"
     TRANSCRIBING = "transcribing"
@@ -156,7 +156,82 @@ class Daemon:
                 self._cycle_language()
                 return self._status_snapshot()
 
+            if cmd == "fix":
+                if self.state != State.IDLE:
+                    return self._status_snapshot({"ok": False, "reason": "busy"})
+                return await self._fix_locked(spell=msg.get("mode") == "spell")
+
+            if cmd == "translate":
+                if self.state != State.IDLE:
+                    return self._status_snapshot({"ok": False, "reason": "busy"})
+                return await self._translate_locked()
+
             return {"ok": False, "error": f"unknown command: {cmd!r}"}
+
+    async def _grab_selection(self) -> str:
+        """Capture the text to fix from the configured source (offloaded I/O)."""
+        text = await asyncio.to_thread(
+            selection.capture_target, self.cfg.fix_source, self.cfg.fix_last_word_count
+        )
+        return (text or "").strip()
+
+    async def _write_back(self, text: str) -> bool:
+        """Type the correction over the selection; notify + return False on failure."""
+        try:
+            await asyncio.to_thread(selection.replace_with, text)
+            return True
+        except Exception as exc:
+            log.exception("write-back failed")
+            output.notify("wayscribe", f"cannot type result: {exc}", icon="dialog-error")
+            return False
+
+    async def _fix_locked(self, spell: bool) -> dict[str, Any]:
+        text = await self._grab_selection()
+        if not text:
+            output.notify("wayscribe", "no text selected", icon="dialog-information")
+            return self._status_snapshot({"ok": False, "reason": "empty"})
+        cand, conf, target = selection.propose_correction(text)
+        if conf < self.cfg.trigram_confidence_min:
+            # Not confident the text is wrong-layout. Defer to the LLM if it is
+            # configured, otherwise leave the text alone (never write back the
+            # gibberish re-keying of already-correct text).
+            if llm.enabled(self.cfg):
+                cand = await llm.fix_layout(text, self.cfg)
+                target = None  # LLM may pick either language; skip the layout switch
+            else:
+                cand = text
+        if spell and llm.enabled(self.cfg):
+            cand = await llm.spellfix(cand, self.cfg)
+        if cand == text:
+            output.notify("wayscribe", "no change", icon="dialog-information")
+            return self._status_snapshot({"ok": True, "changed": False})
+        if not await self._write_back(cand):
+            return self._status_snapshot({"ok": False, "reason": "write-failed"})
+        if self.cfg.switch_layout and target:
+            await keyboard.set_layout_by_lang(target)
+        output.notify("wayscribe", f"{text} → {cand}", icon="dialog-information")
+        log.info("fixed layout: %r -> %r (conf=%.2f)", text, cand, conf)
+        return self._status_snapshot({"ok": True, "changed": True, "text": cand})
+
+    async def _translate_locked(self) -> dict[str, Any]:
+        if not llm.enabled(self.cfg):
+            output.notify(
+                "wayscribe", "LLM not configured (set llm_endpoint)", icon="dialog-error"
+            )
+            return self._status_snapshot({"ok": False, "reason": "llm-disabled"})
+        text = await self._grab_selection()
+        if not text:
+            output.notify("wayscribe", "no text selected", icon="dialog-information")
+            return self._status_snapshot({"ok": False, "reason": "empty"})
+        out = (await llm.translate_to_en(text, self.cfg)).strip()
+        if not out or out == text:
+            output.notify("wayscribe", "no translation", icon="dialog-information")
+            return self._status_snapshot({"ok": True, "changed": False})
+        if not await self._write_back(out):
+            return self._status_snapshot({"ok": False, "reason": "write-failed"})
+        output.notify("wayscribe", f"{text} → {out}", icon="dialog-information")
+        log.info("translated %d chars to en", len(text))
+        return self._status_snapshot({"ok": True, "changed": True, "text": out})
 
     async def _start_recording_locked(self) -> dict[str, Any]:
         try:

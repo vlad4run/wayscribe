@@ -1,4 +1,4 @@
-"""wayscribe CLI: daemon | toggle | status | stop | cancel | doctor | oneshot | lang | log."""
+"""wayscribe CLI: daemon|toggle|status|stop|cancel|doctor|oneshot|lang|log|fix|translate."""
 from __future__ import annotations
 
 import argparse
@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="Language code (e.g. ru, en), 'auto', or 'next' to cycle through configured languages",
     )
+    fix = sub.add_parser("fix", help="Fix wrong-layout text in the selection (ghbdtn -> привет)")
+    fix.add_argument(
+        "--spell", action="store_true", help="Also LLM-correct spelling/grammar after re-keying"
+    )
+    sub.add_parser("translate", help="Translate the selection to English (needs LLM)")
     logp = sub.add_parser("log", help="Show the daemon journal (systemd --user unit)")
     logp.add_argument("-f", "--follow", action="store_true", help="Follow new log lines")
     logp.add_argument(
@@ -84,6 +89,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.value == "next":
             return send_command("lang_next")
         return send_command("lang_set", value=args.value)
+
+    if args.cmd == "fix":
+        from wayscribe.ipc import send_command
+        if args.spell:
+            return send_command("fix", mode="spell")
+        return send_command("fix")
+
+    if args.cmd == "translate":
+        from wayscribe.ipc import send_command
+        return send_command("translate")
 
     if args.cmd == "log":
         return cmd_log(args.follow, args.lines)

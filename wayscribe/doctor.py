@@ -102,6 +102,52 @@ def _tool_checks(cfg: Config) -> list[Check]:
     return checks
 
 
+def _in_input_group() -> bool:
+    import grp
+
+    try:
+        gid = grp.getgrnam("input").gr_gid
+    except KeyError:
+        return False
+    return gid in os.getgroups()
+
+
+def _layout_fixer_checks(cfg: Config) -> list[Check]:
+    """Checks for the layout fixer: selection capture, LLM, evdev (opt-in)."""
+    checks: list[Check] = []
+
+    # wl-paste reads the PRIMARY selection that `fix`/`translate` operate on.
+    have = shutil.which("wl-paste") is not None
+    checks.append(
+        Check("wl-paste", have, "" if have else "install wl-clipboard", required=False)
+    )
+
+    if cfg.llm_endpoint:
+        import httpx
+
+        try:
+            with httpx.Client(base_url=cfg.llm_endpoint, timeout=2.0) as client:
+                client.get("/v1/models").raise_for_status()
+            checks.append(Check("llm", True, cfg.llm_endpoint, required=False))
+        except Exception as exc:
+            checks.append(
+                Check("llm", False, f"unreachable {cfg.llm_endpoint} — {exc}", required=False)
+            )
+
+    if cfg.evdev_autocorrect:
+        ok = _in_input_group()
+        checks.append(
+            Check(
+                "evdev autocorrect",
+                ok,
+                "ON — reads all keystrokes (keylogger-class); "
+                + ("user in 'input' group" if ok else "user NOT in 'input' group"),
+                required=False,
+            )
+        )
+    return checks
+
+
 def _config_check() -> Check:
     path = config_dir() / "config.toml"
     if path.exists():
@@ -115,6 +161,7 @@ def run() -> int:
         _daemon_check(),
         *_backend_checks(cfg),
         *_tool_checks(cfg),
+        *_layout_fixer_checks(cfg),
         _config_check(),
     ]
     width = max(len(c.label) for c in checks)
