@@ -41,6 +41,15 @@ SPACE = 57
 BACKSPACE = 14
 ENTER = 28
 TAB = 15
+# Punctuation that commits a word in place (safe to rewrite, like SPACE). Only
+# key 53 ('/' '?' on US ↔ '.' ',' on RU) qualifies: it is the *only* physical key
+# that is punctuation in both layouts, and it is the period/comma key for a
+# Russian typist — so it cleanly signals "end of word" with zero risk of eating a
+# Cyrillic letter. Every other US-punct key (',' '.' ';' "'" …) is a Cyrillic
+# letter on the RU layout, so it must keep accumulating. Unlike SPACE, this glyph
+# is itself part of the (possibly wrong-layout) text and gets re-keyed with the
+# word: 'ghbdtn/' → 'привет.'.
+PUNCT_TERMINATORS: frozenset[int] = frozenset({53})
 
 
 @dataclass
@@ -67,7 +76,8 @@ class WordBuffer:
         self._chars: list[str] = []
 
     def feed(self, code: int, shift: bool) -> str | None:
-        """Feed one key press. Returns the completed raw word at SPACE, else None."""
+        """Feed one key press. Returns the completed raw word at a word boundary
+        (SPACE / ENTER / TAB), else None."""
         if code in MOD_CODES:
             return None
         if code == BACKSPACE:
@@ -77,32 +87,54 @@ class WordBuffer:
         if code in KEYCODE_CHARS:
             lo, hi = KEYCODE_CHARS[code]
             self._chars.append(hi if shift else lo)
+            if code in PUNCT_TERMINATORS:
+                # Commit the word *including* this punctuation glyph — it is part
+                # of the wrong-layout run and gets re-keyed too (see decide).
+                word = "".join(self._chars)
+                self._chars = []
+                return word
             return None
         if code == SPACE:
             word = "".join(self._chars)
             self._chars = []
             return word or None
-        # ENTER / TAB / arrows / shortcuts: the cursor may have moved, so the
-        # buffer no longer reflects what is on screen — drop it.
+        # ENTER / TAB / arrows / Home / End / Del / shortcuts: the word may be
+        # done, but the cursor context is gone (Enter submits, Tab/arrows move
+        # focus or caret), so the buffer no longer matches the screen — drop it,
+        # take no action.
         self._chars = []
         return None
 
 
-def decide(raw: str, active_lang: str | None, confidence_min: float) -> Correction | None:
+def decide(
+    raw: str,
+    active_lang: str | None,
+    confidence_min: float,
+    *,
+    space_terminated: bool = True,
+) -> Correction | None:
     """Decide whether the raw keystrokes were typed in the wrong layout.
 
     `raw` is the US-QWERTY reading of the physical keys; `active_lang` is the
     layout actually in effect, so the on-screen text is `raw` (Latin layout) or
     its Cyrillic re-key (Russian layout). We then run the Phase-1 plausibility
     check on that on-screen text and correct only when confident.
+
+    `space_terminated` is True when a trailing SPACE was typed after the word
+    (not part of `raw`): we delete one extra char and re-append the space. For a
+    punctuation terminator the glyph is already inside `raw`/`onscreen`, so there
+    is no extra char to delete or re-append.
     """
     onscreen = layout.en_to_ru(raw) if active_lang == "ru" else raw
     cand, conf, target = selection.propose_correction(onscreen)
     if cand == onscreen or conf < confidence_min:
         return None
-    # +1 backspace for the space already typed; re-append it after the fix.
+    tail = " " if space_terminated else ""
     return Correction(
-        backspaces=len(onscreen) + 1, text=cand + " ", target=target, original=onscreen
+        backspaces=len(onscreen) + len(tail),
+        text=cand + tail,
+        target=target,
+        original=onscreen,
     )
 
 
@@ -204,11 +236,13 @@ class AutocorrectEngine:
                 continue
             word = self.buf.feed(ev.code, self._shift)
             if word is not None:
-                await self._handle_word(word)
+                await self._handle_word(word, space_terminated=ev.code == SPACE)
 
-    async def _handle_word(self, raw: str) -> None:
+    async def _handle_word(self, raw: str, *, space_terminated: bool) -> None:
         active = await keyboard.current_layout_lang()
-        correction = decide(raw, active, self.cfg.trigram_confidence_min)
+        correction = decide(
+            raw, active, self.cfg.trigram_confidence_min, space_terminated=space_terminated
+        )
         if correction is not None:
             await self._apply(correction)
 

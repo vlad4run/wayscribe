@@ -52,10 +52,35 @@ def test_buffer_backspace_pops() -> None:
 
 
 def test_buffer_enter_resets_without_word() -> None:
+    # Enter completes a word but the cursor context is gone (it submits) — drop.
     buf = WordBuffer()
     _type(buf, "ghbdtn")
     assert buf.feed(_ENTER, False) is None
     assert buf.feed(SPACE, False) is None  # buffer was cleared
+
+
+def test_buffer_tab_resets_without_word() -> None:
+    buf = WordBuffer()
+    _type(buf, "ghbdtn")
+    assert buf.feed(autocorrect.TAB, False) is None
+    assert buf.feed(SPACE, False) is None
+
+
+def test_buffer_arrow_resets_without_word() -> None:
+    # Left arrow (105): cursor moved, buffer no longer matches the screen — drop.
+    buf = WordBuffer()
+    _type(buf, "ghbdtn")
+    assert buf.feed(105, False) is None
+    assert buf.feed(SPACE, False) is None
+
+
+def test_buffer_slash_commits_word_including_punct() -> None:
+    # '/' (code 53) is punctuation in both layouts and commits the word, keeping
+    # its glyph in the word for re-keying ('ghbdtn/' -> 'привет.').
+    buf = WordBuffer()
+    _type(buf, "ghbdtn")
+    assert buf.feed(53, False) == "ghbdtn/"
+    assert buf.feed(SPACE, False) is None  # buffer cleared
 
 
 # --- decide (layout-aware) ------------------------------------------------
@@ -74,6 +99,14 @@ def test_decide_russian_active_meant_english() -> None:
     assert c is not None
     assert c.text == "hello " and c.original == "руддщ"
     assert c.target == "en"
+
+
+def test_decide_no_trailing_space_when_not_space_terminated() -> None:
+    # Punctuation terminator: glyph already on screen, so no extra backspace and
+    # no re-appended space.
+    c = decide("ghbdtn", "en", 0.15, space_terminated=False)
+    assert c is not None
+    assert c.text == "привет" and c.backspaces == 6
 
 
 def test_decide_correct_english_is_noop() -> None:
