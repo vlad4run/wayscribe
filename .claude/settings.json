@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 420 bash scripts/build-binary.sh)",
+      "Bash(awk '{print \"binary size:\", $1}')",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git rm *)",
+      "Bash(git merge *)"
+    ]
+  }
+}
