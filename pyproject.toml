@@ -48,6 +48,7 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 # the intentional Cyrillic glyphs in keymaps, trigram tables, and test data.
 "wayscribe/layout.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/langdetect.py" = ["RUF001", "RUF002", "RUF003"]
+"wayscribe/_langdata.py" = ["RUF001", "RUF002", "RUF003"]  # generated Cyrillic tables
 "wayscribe/selection.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/autocorrect.py" = ["RUF001", "RUF002", "RUF003"]
 "wayscribe/daemon.py" = ["RUF001", "RUF002", "RUF003"]

@@ -47,7 +47,8 @@
                                         # ("last_word" synthesizes Ctrl+Shift+Left)
 # fix_last_word_count = 1               # words to grab in "last_word" mode
 # switch_layout = false                 # flip the active KDE layout after a fix
-# trigram_confidence_min = 0.15         # below this, defer to the LLM (if configured)
+# trigram_confidence_min = 1.0          # n-gram log-prob delta gate for OOV words
+                                        # (a real-word match always corrects); below this, defer to the LLM
 
 # --- LLM (chat) — separate from the STT endpoint above -----------------------
 # llm_endpoint = ""                     # OpenAI-compatible chat URL; empty = LLM off

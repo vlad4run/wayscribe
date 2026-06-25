@@ -127,7 +127,7 @@ vad_rms_threshold = 500.0             # higher = needs louder speech
 fix_source = "selection"              # "selection" (PRIMARY) or "last_word" (synth Ctrl+Shift+Left)
 fix_last_word_count = 1               # words to grab in "last_word" mode
 switch_layout = false                 # flip KDE layout after the `fix` command (live autocorrect always flips)
-trigram_confidence_min = 0.15         # below this, defer to the LLM (if configured)
+trigram_confidence_min = 1.0          # n-gram log-prob delta gate for OOV words; a real-word match always corrects. Below this, defer to the LLM
 llm_endpoint = ""                     # OpenAI-compatible chat URL; empty disables LLM features
 llm_model = ""                        # chat model name
 llm_api_key = ""                      # for external endpoints

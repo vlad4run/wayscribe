@@ -6,6 +6,7 @@ just-typed word(s) grabbed by synthesizing Ctrl+Shift+Left first. The pure
 `propose_correction` (layout re-key + trigram plausibility) is split from the
 subprocess I/O so it can be unit-tested without a compositor.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,25 +27,39 @@ def _script(text: str) -> str | None:
     return "en" if latin >= cyr else "ru"
 
 
+# Confidence returned for a word-gate match: "certain", clears any finite
+# trigram_confidence_min threshold. The n-gram tier returns a log-prob delta.
+_GATE_CONFIDENCE = float("inf")
+
+
 def propose_correction(text: str) -> tuple[str, float, str | None]:
     """Re-key `text` into the other layout; return (candidate, confidence, target).
 
-    Confidence in [-1, 1] is how much more plausible the re-keyed candidate is
-    than the text as typed (trigram coverage of the target language minus that
-    of the source). Negative/low means the text was probably fine as-is; the
-    caller thresholds on it (and may defer to the LLM). `target` is the language
-    the candidate is in ('ru'/'en'), used for the optional KDE layout switch.
+    Two-tier cascade — the caller thresholds `confidence` on
+    `trigram_confidence_min`, then defers to the LLM:
+
+    * word-gate: the candidate is a real word in the target language and the
+      original is *not* a real word in the source language (and the n-gram agrees
+      it reads at least as well). A near-certain layout mistake → confidence is
+      `inf`.
+    * n-gram: otherwise the mean trigram log-probability delta
+      `logp(candidate, target) - logp(original, source)` — a graceful,
+      vocabulary-independent fallback (positive = candidate reads better).
+
+    `target` is the language the candidate is in ('ru'/'en'), for the optional
+    KDE layout switch. Returns `(text, 0.0, None)` for non-Latin/Cyrillic input.
     """
     sc = _script(text)
     if sc == "en":  # Latin glyphs that may be Russian typed on the wrong layout.
-        cand = layout.en_to_ru(text)
-        conf = langdetect.score(cand)["ru"] - langdetect.score(text)["en"]
-        return cand, conf, "ru"
-    if sc == "ru":  # Cyrillic glyphs that may be English typed on the wrong layout.
-        cand = layout.ru_to_en(text)
-        conf = langdetect.score(cand)["en"] - langdetect.score(text)["ru"]
-        return cand, conf, "en"
-    return text, 0.0, None
+        cand, target, src = layout.en_to_ru(text), "ru", "en"
+    elif sc == "ru":  # Cyrillic glyphs that may be English typed on the wrong layout.
+        cand, target, src = layout.ru_to_en(text), "en", "ru"
+    else:
+        return text, 0.0, None
+    delta = langdetect.logp(cand, target) - langdetect.logp(text, src)
+    if delta >= 0 and langdetect.word_known(cand, target) and not langdetect.word_known(text, src):
+        return cand, _GATE_CONFIDENCE, target
+    return cand, delta, target
 
 
 def read_primary() -> str:

@@ -1,27 +1,37 @@
-"""Trigram scoring: real words score for their language, junk scores low."""
+"""langdetect: word-gate membership + trigram log-probability scoring."""
+
 from __future__ import annotations
 
-from wayscribe import langdetect
+from wayscribe import _langdata, langdetect
 
 
-def test_russian_word_scores_ru() -> None:
-    s = langdetect.score("привет")
-    assert s["ru"] > s["en"]
+def test_word_known_real_words() -> None:
+    assert langdetect.word_known("привет", "ru")
+    assert langdetect.word_known("hello", "en")
 
 
-def test_english_word_scores_en() -> None:
-    s = langdetect.score("hello")
-    assert s["en"] > s["ru"]
+def test_word_known_rejects_wrong_layout_junk() -> None:
+    # ghbdtn (привет mis-keyed) is not an English word; nor a Russian one.
+    assert not langdetect.word_known("ghbdtn", "en")
+    assert not langdetect.word_known("ghbdtn", "ru")
 
 
-def test_wrong_layout_junk_scores_low_in_both() -> None:
-    # ghbdtn (привет on the wrong layout) reads as junk until re-keyed.
-    s = langdetect.score("ghbdtn")
-    assert s["ru"] == 0.0 and s["en"] == 0.0
+def test_word_known_strips_edge_punctuation_and_case() -> None:
+    assert langdetect.word_known("Привет.", "ru")  # case + trailing dot
+    assert langdetect.word_known("hello!", "en")
+    assert not langdetect.word_known("ghbdtn/", "en")  # still not a word
 
 
-def test_short_and_empty_do_not_crash() -> None:
-    assert langdetect.score("") == {"ru": 0.0, "en": 0.0}
-    # Space-padding gives 1-2 char strings real trigrams; result stays well-formed.
-    s = langdetect.score("ab")
-    assert set(s) == {"ru", "en"} and all(0.0 <= v <= 1.0 for v in s.values())
+def test_logp_prefers_native_language() -> None:
+    assert langdetect.logp("привет", "ru") > langdetect.logp("привет", "en")
+    assert langdetect.logp("hello", "en") > langdetect.logp("hello", "ru")
+
+
+def test_logp_empty_returns_floor() -> None:
+    assert langdetect.logp("", "ru") == _langdata.RU_LOGP_FLOOR
+    assert langdetect.logp("", "en") == _langdata.EN_LOGP_FLOOR
+
+
+def test_logp_finite_and_nonpositive_on_short_input() -> None:
+    v = langdetect.logp("ab", "en")
+    assert isinstance(v, float) and v <= 0.0
