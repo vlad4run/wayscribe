@@ -13,7 +13,7 @@ model    = "whisper-v3:turbo"          # the model name that server expects
 
 - [Default: Whisper on the AMD Ryzen AI NPU](#default-whisper-on-the-amd-ryzen-ai-npu)
 - [Any OpenAI-compatible STT](#any-openai-compatible-stt)
-- [Optional: LLM backend (spell-fix / translate)](#optional-llm-backend-spell-fix--translate)
+- [NPU capacity: Whisper uses the whole device](#npu-capacity-whisper-uses-the-whole-device)
 - [Latency](#latency-strix-point-hx-370)
 - [Troubleshooting](#troubleshooting)
 
@@ -110,30 +110,16 @@ and a JSON reply with a `text` field. No code changes, no NPU needed. The
 Wayland/KDE output side (clipboard, auto-type, notifications) is independent of
 which backend you pick.
 
-## Optional: LLM backend (spell-fix / translate)
+## NPU capacity: Whisper uses the whole device
 
-`wayscribe fix --spell` and `wayscribe translate` call an OpenAI-compatible
-**`/v1/chat/completions`** endpoint. This is **separate** from the STT endpoint
-above and **off by default** — the features stay disabled until you set both
-keys:
+The NPU has **8 columns**, and Whisper V3 Turbo alone consumes the whole budget,
+so **no second model fits alongside ASR in one FLM container** — confirmed on
+Strix Point HX 370, and `--pmode turbo` does not help. This is harmless for
+wayscribe: transcription is unaffected, and the container logs the failed
+second-model load and carries on.
 
-```toml
-llm_endpoint = "http://localhost:52626"   # chat server; empty = LLM features off
-llm_model    = "gemma3:1b"                 # the model name that server expects
-# llm_api_key = "sk-…"                      # only for endpoints that require auth
-# llm_timeout_sec = 30.0
-```
-
-Plain layout fixing (`wayscribe fix` without `--spell`) needs none of this — it
-is fully local and offline. The LLM only adds spelling/grammar cleanup and
-English translation.
-
-### Why a *second* container on the NPU
-
-The NPU's 8 columns are fully consumed by Whisper V3 Turbo, so **no LLM fits
-alongside ASR in one FLM container** (confirmed on Strix Point HX 370; see
-[Troubleshooting](#troubleshooting)). To serve chat from the NPU, run a second
-FLM container **without `--asr 1`**, on a different port:
+If you want the same NPU to also serve `/v1/chat/completions` for something
+else, run a **second** FLM container **without `--asr 1`**, on a different port:
 
 ```bash
 docker run -d --rm \
@@ -146,24 +132,8 @@ docker run -d --rm \
   fastflowlm serve gemma3:1b --host 0.0.0.0
 ```
 
-Note the two containers **share one NPU**: they cannot both hold a model loaded
-at once, so this suits occasional spell-fix/translate, not sustained concurrent
-chat + dictation.
-
-### Or any external chat server
-
-Because it is just an HTTP call, point `llm_endpoint` at anything that speaks
-`/v1/chat/completions` — Ollama, llama.cpp/`llama-server`, LM Studio, vLLM, or a
-cloud provider — typically a simpler choice than time-sharing the NPU:
-
-```toml
-llm_endpoint = "http://localhost:11434"    # e.g. Ollama
-llm_model    = "qwen2.5:7b"
-```
-
-The client is best-effort: if the endpoint is unreachable or errors, wayscribe
-logs it and leaves the text unchanged — `fix --spell` still applies the offline
-layout re-key, and `translate` reports that the LLM is unavailable.
+The two containers **share one NPU**: they cannot both hold a model loaded at
+once, so this suits occasional use, not sustained concurrent chat + dictation.
 
 ## Latency (Strix Point HX 370)
 
@@ -186,6 +156,4 @@ startup warm-up uses 1 s of silence and discards the result.)
 | --- | --- | --- |
 | `FLM unreachable at http://localhost:52625` | Backend down | `docker ps`; restart it. The daemon stays idle, it won't crash. |
 | `curl localhost:52625` refused but backend logs "started" | FLM bound to container loopback | the serve command needs `--host 0.0.0.0` (already in `deploy/compose.yaml`) |
-| `Failed to load default model: <LLM>` in backend logs | The NPU's 8 columns are fully used by Whisper — **no LLM fits alongside it**. Confirmed on HX 370; `--pmode turbo` doesn't help. | Harmless: transcription still works on `:52625`. For chat, run a *second* container without `--asr 1` — see [LLM backend](#optional-llm-backend-spell-fix--translate). |
-| `translate` says "LLM not configured" | `llm_endpoint`/`llm_model` unset | Set both keys — see [LLM backend](#optional-llm-backend-spell-fix--translate). Plain `fix` works without them. |
-| `fix --spell` only re-keys, no spelling fix | Chat endpoint unreachable (best-effort: text left unchanged) | `wayscribe doctor` checks `llm` reachability; confirm the chat container/server is up |
+| `Failed to load default model: <LLM>` in backend logs | The NPU's 8 columns are fully used by Whisper — **no second model fits alongside it**. Confirmed on HX 370; `--pmode turbo` doesn't help. | Harmless: transcription still works on `:52625`. See [NPU capacity](#npu-capacity-whisper-uses-the-whole-device). |

@@ -24,8 +24,13 @@ scripts/build-binary.sh                # PyInstaller --onefile -> dist/wayscribe
 scripts/build-rpm.sh                   # openSUSE RPM -> ~/rpmbuild/RPMS/x86_64/
 ```
 
-Runtime CLI: `wayscribe daemon|toggle|status|stop|cancel|doctor|oneshot|lang|log`. See
-README for the full table. Tests use `pytest-asyncio` in `asyncio_mode = auto`.
+Runtime CLI: `wayscribe daemon|toggle|status|stop|cancel|doctor|oneshot|lang|version|log`.
+See README for the full table. Tests use `pytest-asyncio` in `asyncio_mode = auto`.
+
+**Scope note.** `main` is speech-to-text only. The keyboard-layout fixer, the LLM
+spell-fix/translate commands, and the opt-in evdev global autocorrect were
+removed in 0.5.0 and live on the `feat/keyboard-autocorrect` branch. Don't
+reintroduce them here without being asked.
 
 ## Architecture
 
@@ -64,8 +69,9 @@ Key invariants worth knowing before editing:
 - **Output backends** (`output.py`): `clipboard` (wl-copy) and `type`
   (wtype/ydotool) raise `RuntimeError` when their tool is missing so the daemon
   logs it; `notify` (notify-send) is best-effort and silently no-ops. `ydotool
-  type` is ASCII-only, so `type_text` pastes non-ASCII text (wl-copy + Ctrl+V via
-  `ydotool key`) instead — clobbers the clipboard, charset/layout-agnostic.
+  type` is ASCII-only, so `type_text` pastes non-ASCII text (wl-copy +
+  Shift+Insert via `ydotool key`) instead — clobbers the clipboard,
+  charset/layout-agnostic, and works in terminals too (Konsole ignores Ctrl+V).
 
 ## Config
 

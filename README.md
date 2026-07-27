@@ -1,44 +1,33 @@
-# wayscribe — hotkey voice-to-text & layout fixer for KDE Plasma Wayland
+# wayscribe — hotkey voice-to-text for KDE Plasma Wayland
 
 Press a global hotkey, speak, press it again — your words land in the clipboard,
 optionally typed straight into the focused window, always with a KDE
-notification preview. wayscribe also **fixes text typed in the wrong keyboard
-layout** (`ghbdtn` → `привет`) and can **spell-fix or translate** a selection
-through a local LLM. Headless: no GUI windows, just a background daemon and a
-couple of hotkeys.
+notification preview. Headless: no GUI windows, just a background daemon and a
+hotkey.
 
 **Targeted at KDE Plasma on Wayland**: input/output is Wayland-native
-(`wl-copy`, `ydotool`/`wtype`, `notify-send`, KDE D-Bus). Transcription and the
-optional LLM features run in **separate local backends** that wayscribe only
-talks to over plain HTTP — any OpenAI-compatible speech-to-text or chat server
-works, on whatever hardware you have. The reference STT setup runs Whisper V3
-Turbo on an **AMD Ryzen AI NPU**, but that is just one option.
+(`wl-copy`, `ydotool`/`wtype`, `notify-send`, KDE D-Bus). Transcription runs in a
+**separate local backend** that wayscribe only talks to over plain HTTP — any
+OpenAI-compatible speech-to-text server works, on whatever hardware you have. The
+reference setup runs Whisper V3 Turbo on an **AMD Ryzen AI NPU**, but that is
+just one option.
 
 > **Install, configure, troubleshoot → [SETUP.md](SETUP.md).**
-> Transcription/LLM backends → **[BACKEND.md](BACKEND.md)**.
+> Transcription backend → **[BACKEND.md](BACKEND.md)**.
 > Building from source, packaging, hacking on the code → **[DEVELOPMENT.md](DEVELOPMENT.md)**.
 
 ## How it works
 
 ```mermaid
 flowchart TD
-    subgraph keys[KDE Custom Shortcuts]
-        T["Meta+Alt+Space<br/>toggle"]
-        F["Meta+Alt+F · Meta+Alt+T<br/>fix · translate"]
-    end
-    T & F -->|Unix socket| Daemon["wayscribe daemon<br/>(asyncio state machine)"]
+    T["KDE Custom Shortcut<br/>Meta+Alt+Space · toggle"]
+    T -->|Unix socket| Daemon["wayscribe daemon<br/>(asyncio state machine)"]
 
     Daemon -->|record| Mic["Recorder<br/>(microphone)"]
     Mic -->|WAV over HTTP| STT["STT backend<br/>(OpenAI-compatible)"]
     STT -->|transcript| Daemon
 
-    Daemon -->|re-key wrong layout| Fixer["layout fixer<br/>(ЙЦУКЕН↔QWERTY + trigrams)"]
-    Fixer -.->|spell / translate| LLM["chat LLM backend<br/>(optional)"]
-    LLM -.-> Daemon
-
     Daemon --> Out["clipboard · type · notification"]
-
-    Kbd["physical keyboard<br/>(/dev/input)"] -.->|autocorrect, opt-in| Daemon
 ```
 
 1. The hotkey runs a thin client (`wayscribe toggle`) that sends one command to
@@ -52,12 +41,6 @@ The daemon holds a small state machine (`IDLE → RECORDING → TRANSCRIBING →
 IDLE`). Safety rails: a max-duration watchdog auto-stops a forgotten recording,
 and an opt-in silence detector can stop recording for you after you stop
 talking.
-
-Beyond dictation, the same daemon powers the **layout fixer** (`wayscribe fix` —
-re-keys wrong-layout text via a static ЙЦУКЕН↔QWERTY map + trigram detection)
-and, when a local LLM endpoint is configured, **spell-fix and translate** on the
-current selection. An opt-in, keylogger-class **global autocorrect** can also fix
-wrong-layout words live as you type. See [SETUP.md](SETUP.md) for the config.
 
 ## Usage
 
@@ -76,10 +59,7 @@ types itself into whatever window has focus — no paste needed.
 | `wayscribe lang` | Show the current transcription language. |
 | `wayscribe lang next` | Cycle to the next language in `languages`. |
 | `wayscribe lang ru` / `en` / `auto` | Set the language; `auto` lets Whisper detect it. |
-| `wayscribe fix` | Fix wrong-layout text in the selection (`ghbdtn` → `привет`). |
-| `wayscribe fix --spell` | Also LLM-correct spelling/grammar after re-keying (needs `llm_endpoint`). |
-| `wayscribe translate` | Translate the selection to English (needs `llm_endpoint`). |
-| `wayscribe autocorrect [on\|off\|toggle]` | Toggle global auto-layout-fix as you type (needs `evdev_autocorrect = true`). |
+| `wayscribe version` | Print the package version plus the git build hash. |
 | `wayscribe log [-f] [-n N]` | Tail the daemon journal (systemd `--user` unit). |
 
 Quick smoke test once everything is up:

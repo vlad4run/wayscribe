@@ -11,8 +11,6 @@ packaging lives in **[DEVELOPMENT.md](DEVELOPMENT.md)**; backend setup in
 - **A transcription backend** reachable over HTTP — any OpenAI-compatible STT
   server (the reference setup runs Whisper on an AMD Ryzen AI NPU). See
   [BACKEND.md](BACKEND.md).
-- **(Optional) a chat LLM endpoint** for `fix --spell` / `translate` — any
-  OpenAI-compatible local server; off until `llm_endpoint` is set.
 - **Runtime dependencies** (the RPM pulls these in):
 
 | Package | Role | Required? |
@@ -87,8 +85,6 @@ In **System Settings → Shortcuts → Custom Shortcuts**, add commands and bind
 
 - `Meta+Alt+Space` → `wayscribe toggle` *(start/stop recording)*
 - `Meta+Alt+L` → `wayscribe lang next` *(cycle language; optional)*
-- `Meta+Alt+F` → `wayscribe fix` *(fix wrong-layout selection; optional)*
-- `Meta+Alt+T` → `wayscribe translate` *(translate selection to English; needs LLM)*
 
 > `Meta+Space` is Krunner — that's why the default is `Meta+Alt+Space`.
 
@@ -122,17 +118,6 @@ auto_stop = false                     # opt-in: silence-detection auto-stop
 auto_stop_silence_sec = 1.5           # required quiet window after first speech
 auto_stop_min_record_sec = 0.8        # never auto-stop in the first N seconds
 vad_rms_threshold = 500.0             # higher = needs louder speech
-
-# Layout fixer (`wayscribe fix` / `translate` / `autocorrect`)
-fix_source = "selection"              # "selection" (PRIMARY) or "last_word" (synth Ctrl+Shift+Left)
-fix_last_word_count = 1               # words to grab in "last_word" mode
-switch_layout = false                 # flip KDE layout after the `fix` command (live autocorrect always flips)
-trigram_confidence_min = 1.0          # n-gram log-prob delta gate for OOV words; a real-word match always corrects. Below this, defer to the LLM
-llm_endpoint = ""                     # OpenAI-compatible chat URL; empty disables LLM features
-llm_model = ""                        # chat model name
-llm_api_key = ""                      # for external endpoints
-llm_timeout_sec = 30.0
-evdev_autocorrect = false             # master gate for global autocorrect (keylogger-class)
 ```
 
 `endpoint` and `model` select the transcription backend — point them at a LAN
@@ -150,7 +135,7 @@ daemon** running and access to **`/dev/uinput`** (run `ydotoold` as root, or add
 a udev rule + group so your user can open it), and it types wherever focus lands
 at finish time. `ydotool type` only emits **ASCII** keycodes, so for non-ASCII
 transcripts (e.g. Cyrillic) wayscribe automatically falls back to a
-clipboard-paste — `wl-copy` + a synthesized **Ctrl+V** — which is charset- and
+clipboard-paste — `wl-copy` + a synthesized **Shift+Insert** — which is charset- and
 layout-agnostic. That paste **overwrites the clipboard**; keep `clipboard` in
 `outputs` anyway as the reliable manual fallback.
 
@@ -168,30 +153,6 @@ maps it to a language (`us`/`gb` → `en`, others pass through), so the
 `wayscribe lang` changes are overwritten on the next recording — set it to
 `false` to pin the language yourself. Best-effort: on a non-KDE session it
 silently keeps the configured `language`.
-
-**Layout fixer** — `wayscribe fix` re-keys wrong-layout text (`ghbdtn` →
-`привет`) using a static ЙЦУКЕН↔QWERTY map; trigram scoring picks the direction
-and confidence, so already-correct text is left alone. It operates on the
-PRIMARY selection (`fix_source = "selection"`) — highlight the word first — or on
-the just-typed word (`"last_word"`, synthesizes Ctrl+Shift+Left). Bind it to a
-hotkey for a one-key fix. With `llm_endpoint` set (an OpenAI-compatible chat
-endpoint — a second FLM container per [BACKEND.md](BACKEND.md), or any external
-server), `fix --spell` also cleans up spelling/grammar and `wayscribe translate`
-renders the selection in English.
-
-**Global autocorrect** *(experimental, opt-in, keylogger-class)* — `evdev_autocorrect
-= true` unlocks `wayscribe autocorrect [on|off|toggle]`, which reads the physical
-keyboard via `/dev/input` and fixes wrong-layout words automatically as you type.
-It takes an exclusive grab of the keyboard and replays keystrokes, so it is off
-by default and gated behind both the config flag *and* a runtime toggle. The
-`evdev` dependency ships with the RPM binary (and with `pip install wayscribe`);
-the only setup is **membership in the `input` group**:
-
-```bash
-sudo usermod -aG input "$USER"   # then re-login
-```
-
-Verify with `wayscribe doctor` (it checks the `input` group when the gate is on).
 
 ## Troubleshooting
 

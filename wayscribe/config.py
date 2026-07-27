@@ -47,24 +47,6 @@ class Config:
     auto_stop_silence_sec: float = 1.5
     auto_stop_min_record_sec: float = 0.8
     vad_rms_threshold: float = 500.0
-    # Layout fixer (ghbdtn -> привет)
-    fix_source: str = "selection"  # "selection" | "last_word"
-    fix_last_word_count: int = 1
-    # flip KDE layout after the `fix` command; live autocorrect always flips
-    switch_layout: bool = False
-    # Min confidence to auto-correct a layout mistake. A real-word match is
-    # "certain" (passes any value); otherwise this gates the n-gram tier, whose
-    # score is the mean trigram log-probability delta (typ. ~+2..+5 for a true
-    # wrong-layout word, negative for correctly-typed text). Below it, defer to
-    # the LLM (if enabled).
-    trigram_confidence_min: float = 1.0
-    # LLM (chat) — separate from the STT endpoint above
-    llm_endpoint: str = ""  # empty disables all LLM features
-    llm_model: str = ""
-    llm_api_key: str = ""
-    llm_timeout_sec: float = 30.0
-    # Phase 2 (opt-in, security-sensitive): global evdev autocorrect
-    evdev_autocorrect: bool = False
 
     @classmethod
     def load(cls) -> Config:

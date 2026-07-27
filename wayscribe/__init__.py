@@ -1,10 +1,10 @@
-"""wayscribe: hotkey voice-to-text and keyboard-layout fixer for KDE Plasma Wayland."""
+"""wayscribe: hotkey voice-to-text for KDE Plasma Wayland."""
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
-__version__ = "0.4.2"
+__version__ = "0.5.0"
 
 
 def _git_hash() -> tuple[str, bool] | None:

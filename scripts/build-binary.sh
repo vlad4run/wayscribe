@@ -8,14 +8,8 @@
 #   - For the output backends you intend to use: wl-clipboard, wtype/ydotool,
 #     libnotify-tools.
 #
-# The global autocorrect needs python-evdev (a core dependency). It is bundled
-# by default so `wayscribe autocorrect` works from the binary. Set
-# WITHOUT_EVDEV=1 to skip it (leaner binary; that one feature then no-ops with a
-# "python-evdev not installed" notice).
-#
 # Usage:
-#   scripts/build-binary.sh                    # uses .venv (creates if missing)
-#   WITHOUT_EVDEV=1 scripts/build-binary.sh    # skip the evdev bundle
+#   scripts/build-binary.sh            # uses .venv (creates if missing)
 #   PY=/usr/bin/python3.12 scripts/build-binary.sh
 set -euo pipefail
 
@@ -33,20 +27,6 @@ fi
 if ! "$PY" -m PyInstaller --version >/dev/null 2>&1; then
     echo ">>> Installing PyInstaller into $PY"
     "$PY" -m pip install --quiet pyinstaller
-fi
-
-EVDEV_ARGS=()
-if [ "${WITHOUT_EVDEV:-0}" = "1" ]; then
-    echo ">>> Skipping evdev bundle (WITHOUT_EVDEV=1) — autocorrect disabled in binary"
-else
-    if ! "$PY" -c "import evdev" >/dev/null 2>&1; then
-        echo ">>> Installing evdev into $PY"
-        "$PY" -m pip install --quiet evdev
-    fi
-    # evdev is a C-extension with data + submodules (ecodes, _input); pull it
-    # all in so the bundled `wayscribe autocorrect` can import it at runtime.
-    EVDEV_ARGS=(--collect-all evdev)
-    echo ">>> Bundling evdev (global autocorrect enabled in binary)"
 fi
 
 echo ">>> Cleaning previous build artifacts"
@@ -69,7 +49,6 @@ echo ">>> Building single-file binary"
     --clean \
     --log-level WARN \
     --collect-submodules wayscribe \
-    "${EVDEV_ARGS[@]}" \
     wayscribe/__main__.py
 
 SIZE="$(du -h dist/wayscribe | awk '{print $1}')"
